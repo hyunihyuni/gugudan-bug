@@ -1,0 +1,1344 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>구구단 버그 대작전</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&family=Nanum+Pen+Script&display=swap">
+<style>
+/* 레이아웃: 상단 HUD / 가운데 밤하늘 낙하 필드 / 하단 답 입력+숫자패드 — 한 화면 아케이드 (의도적으로 어두운 단일 테마) */
+:root{
+  --ink-0:#11132b; --ink-1:#1b1f48; --ink-2:#272d66; --line:#3b4287;
+  --text:#eef0ff; --muted:#a9afdc;
+  --paper:#fff8e6; --paper-ink:#2a2350; --paper-edge:#d9c99f;
+  --sun:#ffcf4a; --sun-ink:#4d3200;
+  --bug:#ff5d73; --bug-deep:#3d1024;
+  --heart:#ff8fb6; --ok:#7be0a6;
+  --easy:#7ed957; --mid:#ff9f43; --hard:#b48cff; --sky:#6fd3ff;
+  --f-display:"Jua","Gowun Dodum","Malgun Gothic",system-ui,sans-serif;
+  --f-body:"Gowun Dodum","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ink-0);color:var(--text);font-family:var(--f-body);font-size:16px;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+#app{height:100%;max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:10px;display:flex;flex-direction:column}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column}
+.scroll{overflow-y:auto;overflow-x:hidden}
+
+/* ---------- 시작 화면 ---------- */
+.hero{display:flex;flex-direction:column;gap:6px;padding-block:18px 10px}
+.hero h1{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(34px,6.4vw,62px);line-height:1.05;text-wrap:balance;letter-spacing:.01em}
+.hero h1 .x{color:var(--sun)}
+.hero h1 .b{color:var(--bug)}
+.hero p{margin:0;color:var(--muted);font-size:clamp(15px,2vw,18px);max-width:40em}
+.label{font-size:13px;letter-spacing:.12em;color:var(--muted);margin:18px 0 8px}
+/* 버그 이야기 */
+.story{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:18px;padding:18px;border-radius:18px;background:var(--ink-1);border:1px solid var(--line);align-items:center}
+.st-art{min-height:200px;display:grid;place-items:center;border-radius:14px;background:#0c0e22;padding:14px;min-width:0}
+.st-art canvas{width:100%;max-width:360px;height:auto;image-rendering:pixelated;display:block}
+.st-txt{display:flex;flex-direction:column;gap:10px;min-width:0}
+.st-step{font-size:13px;letter-spacing:.1em;color:var(--sun)}
+.st-txt h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(24px,3.4vw,34px);text-wrap:balance;line-height:1.2}
+.st-txt p{margin:0;font-size:clamp(16px,1.9vw,19px);line-height:1.7;color:#d9dcf7;max-width:34em}
+.st-txt p b{color:var(--sun);font-weight:400;font-family:var(--f-display)}
+.st-nav{display:flex;align-items:center;gap:10px;margin-top:4px}
+.st-nav .dots{display:flex;gap:6px;flex:1;justify-content:center}
+.st-nav .dots button{width:12px;height:12px;min-height:0;border-radius:50%;border:0;padding:0;background:var(--ink-2)}
+.st-nav .dots button[aria-current="true"]{background:var(--sun);width:28px;border-radius:6px}
+.st-art .face canvas,.st-art .logbook canvas{width:auto;max-width:none}
+.st-nav .btn{padding:0 16px;white-space:nowrap;font-size:18px}
+.note{font-size:13px;color:var(--muted);margin:8px 2px 0;line-height:1.5}
+.logbook{width:100%;max-width:360px;background:#f4ecd3;color:#2b2a3a;border-radius:6px;padding:14px 16px;box-shadow:0 6px 0 #b9ad8a;font-family:"Nanum Pen Script","Gowun Dodum",cursive;transform:rotate(-1.5deg)}
+.logbook .ln{border-bottom:1px solid #c9bfa0;padding:4px 0;font-size:22px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.logbook .ln small{font-size:18px;color:#6b6450}
+.logbook .tape{position:relative;display:inline-block;padding:4px 10px;background:rgba(255,255,255,.55);border:1px dashed #b9ad8a}
+.logbook .tape canvas{width:54px;max-width:none}
+.logbook .hand{font-size:26px;color:#1d3b8a}
+.logbook .ko{font-family:var(--f-body);font-size:14px;color:#5a5440;margin-top:8px}
+.tl{display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px}
+.tl div{display:grid;grid-template-columns:86px 1fr;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--ink-1)}
+.tl b{font-family:var(--f-display);font-weight:400;color:var(--sun);font-size:18px}
+.tl span{font-size:15px;line-height:1.4}
+.demo{display:flex;flex-direction:column;align-items:center;gap:10px}
+.demo .arrow{font-family:var(--f-display);font-size:18px;color:var(--muted)}
+.demo .fixed{font-family:var(--f-display);font-size:22px;padding:8px 16px;border-radius:12px;background:#183d2c;color:var(--ok);border:2px solid var(--ok)}
+
+.define{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:320px}
+.dfn{width:100%;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:12px;align-items:center;padding:12px 16px;border-radius:14px}
+.dfn .big{grid-row:span 2;font-size:34px}
+.dfn b{font-family:var(--f-display);font-weight:400;font-size:24px}
+.dfn span:last-child{font-size:15px;color:#d9dcf7}
+.dfn.bug{background:var(--bug-deep);border:2px solid var(--bug)}
+.dfn.fix{background:#183d2c;border:2px solid var(--ok)}
+.dfn-steps{display:flex;gap:10px;align-items:center;font-family:var(--f-display);font-size:18px}
+.dfn-steps .ar{color:var(--sun)}
+.codefix{display:flex;flex-direction:column;gap:14px;width:100%;max-width:360px}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.grid5 span{aspect-ratio:1;max-width:100%;border-radius:8px;background:#2a2f52;display:grid;place-items:center;font-size:26px}
+.grid5 .stop{font-family:var(--f-display);font-size:13px;color:#fff;background:var(--bug-deep);outline:2px dashed var(--bug)}
+.cols{display:flex;align-items:center;gap:8px}
+.col{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.col small{font-size:12px;color:var(--muted)}
+.cb{padding:8px 10px;border-radius:8px;background:#4a6cd4;font-family:var(--f-display);font-size:16px;white-space:nowrap}
+.cb.bad{background:var(--bug);color:#fff}
+.cb.good{background:#2f9a62;color:#fff}
+.to{font-family:var(--f-display);font-size:24px;color:var(--sun)}
+.lifefix{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:380px}
+.lf{padding:10px;border-radius:10px;background:var(--bug-deep);border:1px solid var(--bug);min-width:0}
+.lf.ok{background:#183d2c;border-color:var(--ok)}
+.lf small{font-family:var(--f-display);font-size:14px}
+.lf ol{margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.5}
+.lf p{margin:6px 0 0;font-size:13px;line-height:1.45}
+
+.steps{display:flex;gap:8px;padding-block:4px 6px;overflow-x:auto}
+.steps button{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--ink-1);border-radius:999px;padding:6px 16px 6px 6px;min-height:44px;font-family:var(--f-display);font-size:17px;color:var(--muted);white-space:nowrap}
+.steps .no{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--ink-2);color:var(--text);font-size:15px}
+.steps button[aria-current="true"]{color:var(--text);border-color:var(--sun)}
+.steps button[aria-current="true"] .no{background:var(--sun);color:var(--sun-ink)}
+.steps #stepGame .no{background:var(--bug);color:#fff}
+.gonext{display:flex;justify-content:flex-end;padding-block:16px 20px}
+.gonext .btn{font-size:20px}
+.choose{display:flex;flex-direction:column;gap:10px;padding-block:18px 24px}
+.choose p{margin:0;font-family:var(--f-display);font-size:20px}
+.choose-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.pick{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;align-items:center;text-align:left;padding:18px;border-radius:18px;border:2px solid var(--line);background:var(--ink-1);min-height:44px;transition:transform .12s,border-color .12s}
+.pick:hover{transform:translateY(-2px);border-color:var(--ok)}
+.pick.game:hover{border-color:var(--bug)}
+.pick .pk-ic{grid-row:span 2;font-size:38px}
+.pick b{font-family:var(--f-display);font-weight:400;font-size:24px}
+.pick span:last-child{font-size:14px;color:var(--muted)}
+.pr-dans{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
+.pr-dans .dan{padding:10px 4px}
+.pr-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding-top:12px}
+.pr-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.pr-head h3{margin:0}
+.btn.sm{min-height:40px;font-size:15px;padding:0 14px}
+.pr-tip{margin:6px 0 10px;font-size:14px;color:var(--muted);line-height:1.5}
+.pr-tip b{color:var(--sun);font-weight:400;font-family:var(--f-display)}
+.pr-rows{display:flex;flex-direction:column;gap:6px}
+.pr-row{display:grid;grid-template-columns:auto auto 1fr;gap:4px 12px;align-items:center;text-align:left;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--ink-0);min-height:44px}
+.pr-eq{font-family:var(--f-display);font-size:22px;font-variant-numeric:tabular-nums}
+.pr-v{font-family:var(--f-display);font-size:22px;min-width:44px;text-align:center;border-radius:8px;background:var(--ink-2);color:transparent;position:relative}
+.pr-v::after{content:"?";position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
+.pr-add{grid-column:1/-1;display:none;font-size:13px;color:var(--ok)}
+.pr-row.open .pr-v{background:var(--sun);color:var(--sun-ink)}
+.pr-row.open .pr-v::after{content:none}
+.pr-row.open .pr-add{display:block}
+.pr-dots{display:flex;gap:6px;margin-bottom:12px}
+.pr-dots i{flex:1;height:8px;border-radius:4px;background:var(--ink-2)}
+.pr-dots i.done{background:var(--ok)}
+.pr-dots i.now{background:var(--sun)}
+.pr-q{font-family:var(--f-display);font-size:clamp(40px,6vw,60px);text-align:center;font-variant-numeric:tabular-nums}
+.pr-ans{margin:8px auto;width:min(220px,100%)}
+.pr-fb{min-height:44px;text-align:center;font-size:15px;color:var(--muted);padding:6px;line-height:1.5}
+.pr-fb.ok{color:var(--ok);font-family:var(--f-display);font-size:20px}
+.pr-fb.bad{color:#ffb3c0}
+.pr-pad{grid-template-columns:repeat(7,1fr)!important}
+.pr-pad .go{grid-column:span 3!important}
+.pr-stars{font-size:44px;letter-spacing:4px}
+.road{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.rd{flex:1 1 160px;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;background:var(--ink-0);border:2px solid var(--tc)}
+.rd-st{font-size:12px;letter-spacing:.1em;color:var(--tc)}
+.rd b{font-family:var(--f-display);font-weight:400;font-size:26px}
+.rd-k{font-size:13px;color:var(--muted)}
+.rd-ar{font-family:var(--f-display);font-size:22px;color:var(--muted)}
+@media (max-width:720px){
+  .pr-grid{grid-template-columns:1fr}
+  .pr-dans{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .rd-ar{display:none}
+}
+#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}
+.card.victory{width:min(520px,100%);border:3px solid var(--sun);background:radial-gradient(circle at 50% 0%,#3a2f7a,var(--ink-1) 70%);box-shadow:0 0 60px rgba(255,207,74,.35);gap:10px}
+.victory .trophy{font-size:72px;line-height:1;animation:trophy 1.2s ease-in-out infinite}
+@keyframes trophy{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-10px) rotate(6deg) scale(1.08)}}
+.victory .cheer{font-size:clamp(40px,9vw,64px);color:var(--sun);text-shadow:0 4px 0 #b88a14,0 0 30px rgba(255,207,74,.6);animation:cheer .9s ease-in-out infinite alternate}
+@keyframes cheer{from{transform:scale(1)}to{transform:scale(1.08)}}
+.victory .v-sub{font-size:18px;color:var(--text)}
+.victory .v-badge{font-family:var(--f-display);font-size:22px;padding:8px 18px;border-radius:999px;background:var(--bug);color:#fff;box-shadow:0 4px 0 #9a2540}
+.victory .v-stats{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.victory .v-stats span{padding:6px 12px;border-radius:10px;background:var(--ink-0);font-size:15px}
+.victory .v-stats b{font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--sun)}
+.victory .v-new{font-family:var(--f-display);font-size:18px;color:var(--ok)}
+.victory .btn{font-size:22px;margin-top:4px}
+/* 맞춤 설정 */
+.setup{padding:20px;border-radius:18px;background:var(--ink-1);border:1px solid var(--line);display:flex;flex-direction:column;gap:16px}
+.setup-head{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-start;justify-content:space-between}
+.setup-head h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:24px}
+.setup-head p{margin:2px 0 0;font-size:14px;color:var(--muted)}
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+.presets button{border:1px solid var(--line);background:var(--ink-0);border-radius:10px;padding:8px 14px;min-height:40px;font-size:14px;color:var(--pc)}
+.presets button:hover{border-color:var(--pc)}
+.dans{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px}
+.dan{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 4px 12px;border-radius:14px;border:2px solid var(--line);background:var(--ink-0);min-height:44px;transition:transform .1s,background .15s}
+.dan:hover{transform:translateY(-2px)}
+.dan .n{font-family:var(--f-display);font-size:28px;line-height:1}
+.dan .s{font-size:12px;color:var(--muted)}
+.dan .tier{font-size:12px;padding:1px 8px;border-radius:8px;background:var(--ink-2);color:var(--tc)}
+.dan[aria-pressed="true"]{background:var(--tc);border-color:var(--tc);color:var(--ink-0);box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.dan[aria-pressed="true"] .s{color:var(--ink-0);opacity:.75}
+.dan[aria-pressed="true"] .tier{background:rgba(17,19,43,.2);color:var(--ink-0)}
+.speed-row{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+.speed-row .tt{font-size:14px;color:var(--muted)}
+.speeds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.speeds button{border:0;border-radius:12px;min-height:48px;background:var(--ink-0);font-family:var(--f-display);font-size:18px;color:var(--muted)}
+.speeds button[aria-pressed="true"]{background:var(--sun);color:var(--sun-ink)}
+.startbar{position:sticky;bottom:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:12px 16px;margin-top:6px;border-radius:16px;background:var(--ink-2);border:1px solid var(--line);box-shadow:0 -8px 24px rgba(8,9,24,.6)}
+.startbar .sum{font-size:15px;min-width:0}
+.startbar .sum b{font-family:var(--f-display);font-weight:400;font-size:19px;color:var(--sun)}
+.startbar .btn{font-size:22px;min-width:160px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+@media (max-width:720px){
+  .story{grid-template-columns:1fr}
+  .st-nav .dots{display:none}
+  .st-nav{justify-content:space-between}
+  .dans{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .steps{gap:6px}
+  .steps button{font-size:14px;padding:4px 10px 4px 4px;gap:6px}
+  .steps .no{width:26px;height:26px;font-size:13px}
+  .dan .tier{white-space:nowrap;font-size:11px;padding:1px 5px}
+  .speeds button{font-size:15px}
+}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.lg{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--ink-1)}
+.lg .face{position:static;font-size:18px;flex:0 0 auto}
+.lg p{margin:0;font-size:14px;line-height:1.45;color:var(--muted);min-width:0}
+.lg p b{color:var(--text);font-weight:400;font-family:var(--f-display);font-size:16px;display:block}
+.toggles{display:flex;flex-wrap:wrap;gap:10px}
+.tg{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;min-height:48px;border:1px solid var(--line);border-radius:14px;background:var(--ink-1);flex:1 1 200px}
+.tg .ic{font-size:20px;line-height:1}
+.tg .tx{flex:1;text-align:left;font-size:15px}
+.tg .sw{position:relative;width:52px;height:30px;border-radius:15px;background:#3a3f72;flex:0 0 auto;transition:background .2s}
+.tg .sw::after{content:"끔";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#c9cce8;transition:transform .2s;font-size:10px;display:grid;place-items:center;color:var(--ink-0)}
+.tg[aria-checked="true"] .sw{background:var(--ok)}
+.tg[aria-checked="true"] .sw::after{content:"켬";transform:translateX(22px);background:#fff}
+.tg[aria-checked="false"] .tx{color:var(--muted)}
+
+/* ---------- 게임 HUD ---------- */
+.hud{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding-bottom:8px}
+.lives{display:flex;gap:2px;font-size:24px;line-height:1;min-width:0}
+.lives i{font-style:normal;color:var(--heart);transition:transform .2s}
+.lives i.empty{color:#4a4f86}
+.hud .stg{font-family:var(--f-display);font-size:18px}
+.hud .stg small{font-family:var(--f-body);font-size:13px;color:var(--muted);margin-left:6px}
+.score{font-family:var(--f-display);font-size:24px;font-variant-numeric:tabular-nums;color:var(--sun);margin-left:auto}
+.prog{flex:1 1 180px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);min-width:150px}
+.prog .tr{flex:1;height:10px;border-radius:6px;background:var(--ink-2);overflow:hidden}
+.prog .fl{height:100%;width:0;background:linear-gradient(90deg,var(--sun),var(--bug));transition:width .3s}
+.ibtn{border:0;background:var(--ink-1);border-radius:10px;min-width:44px;min-height:44px;padding:0 12px;font-size:15px}
+.ibtn:hover{background:var(--ink-2)}
+.shake{animation:shake .35s}
+@keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+
+/* ---------- 낙하 필드 ---------- */
+.field{position:relative;flex:1;min-height:260px;border-radius:18px;overflow:hidden;transition:background .6s}
+.field::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.7;background-image:
+  radial-gradient(1.5px 1.5px at 12% 18%,#fff,transparent),radial-gradient(1px 1px at 34% 62%,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 58% 26%,#fff,transparent),radial-gradient(1px 1px at 76% 70%,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 88% 14%,#fff,transparent),radial-gradient(1px 1px at 22% 84%,#fff,transparent),
+  radial-gradient(1px 1px at 66% 48%,#fff,transparent),radial-gradient(1.5px 1.5px at 46% 8%,#fff,transparent)}
+.field.s1{background:linear-gradient(180deg,#1b2860 0%,#2f4e92 100%)}
+.field.s2{background:linear-gradient(180deg,#26174f 0%,#5d2a70 100%)}
+.field.s3{background:linear-gradient(180deg,#14092a 0%,#521433 100%)}
+.field.s3::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 120%,rgba(255,93,115,.25),transparent 60%)}
+.floor{position:absolute;left:0;right:0;bottom:0;height:8px;background:repeating-linear-gradient(90deg,var(--sun) 0 14px,#3a2a00 14px 28px);opacity:.8;z-index:2}
+.floor.flash{animation:flash .5s}
+@keyframes flash{0%,100%{box-shadow:none}30%{box-shadow:0 -30px 50px rgba(255,93,115,.8);background:var(--bug)}}
+.field.hit{animation:fieldhit .35s}
+@keyframes fieldhit{30%{box-shadow:inset 0 0 0 6px var(--bug)}}
+
+.blk{position:absolute;left:0;top:0;will-change:transform;z-index:3}
+.face{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 14px 8px;border-radius:12px;background:var(--paper);color:var(--paper-ink);
+  font-family:var(--f-display);font-size:clamp(20px,2.7vw,30px);line-height:1.1;white-space:nowrap;box-shadow:0 4px 0 var(--paper-edge),0 8px 14px rgba(0,0,0,.35)}
+.face .tag{font-size:.48em;letter-spacing:.04em;opacity:.85}
+.face .q{font-variant-numeric:tabular-nums}
+.t-fast{background:var(--sun);color:var(--sun-ink);box-shadow:0 4px 0 #c99a1a,0 0 18px rgba(255,207,74,.6)}
+.t-bomb{background:#26160a;color:#ffe2b8;border:2px solid var(--mid);box-shadow:0 4px 0 #7a3e10,0 0 22px rgba(255,159,67,.75);animation:bombpulse .6s ease-in-out infinite}
+@keyframes bombpulse{50%{box-shadow:0 4px 0 #7a3e10,0 0 34px rgba(255,159,67,1);transform:scale(1.06)}}
+.field.boom{animation:boomflash .5s}
+@keyframes boomflash{0%{box-shadow:inset 0 0 0 0 #fff}20%{box-shadow:inset 0 0 0 2000px rgba(255,236,190,.55)}100%{box-shadow:inset 0 0 0 0 transparent}}
+.field.storm{animation:storm .8s}
+@keyframes storm{20%,60%{box-shadow:inset 0 0 0 6px var(--sun)}40%{box-shadow:inset 0 0 0 2px var(--sun)}}
+.field.rage::before{background-color:rgba(255,40,80,.12);animation:ragepulse 1s ease-in-out infinite}
+@keyframes ragepulse{50%{background-color:rgba(255,40,80,.24)}}
+.boss.rage canvas{filter:drop-shadow(0 0 12px rgba(255,60,90,.9))}
+.boss.rage .body{animation:ragebob .35s ease-in-out infinite}
+@keyframes ragebob{25%{transform:translate(-3px,3px)}75%{transform:translate(3px,-2px)}}
+.float.combo{color:var(--mid);font-size:26px}
+.t-heart{background:var(--heart);color:#4a0f2a;box-shadow:0 4px 0 #c75f86,0 8px 14px rgba(0,0,0,.35)}
+.t-bug{background:var(--bug-deep);color:#ffe3e8;border:2px solid var(--bug);box-shadow:0 4px 0 #7a1a37,0 0 16px rgba(255,93,115,.45)}
+.t-bug .bad{color:var(--bug);text-decoration:line-through wavy;text-decoration-thickness:2px}
+.t-bug canvas{image-rendering:pixelated;animation:wiggle .5s steps(2) infinite}
+.t-boss{background:#2b1650;color:#fff3c8;border:2px solid var(--sun);box-shadow:0 4px 0 #8a6a12,0 0 16px rgba(255,207,74,.4)}
+@keyframes wiggle{50%{transform:translateY(-2px) rotate(-4deg)}}
+.face.pop{animation:pop .32s forwards}
+@keyframes pop{40%{transform:scale(1.25);filter:brightness(1.5)}100%{transform:scale(.2);opacity:0}}
+.face.crash{animation:crash .45s forwards}
+@keyframes crash{0%{filter:none}30%{transform:scaleY(.6) scaleX(1.2);background:var(--bug);color:#fff}100%{transform:scaleY(.2) scaleX(1.4);opacity:0}}
+.face.poof{animation:poof .4s forwards}
+@keyframes poof{to{opacity:0;transform:scale(.6) translateY(-10px)}}
+
+.float{position:absolute;z-index:6;font-family:var(--f-display);font-size:22px;color:var(--sun);pointer-events:none;text-shadow:0 2px 0 rgba(0,0,0,.4);animation:up .9s forwards;white-space:nowrap}
+.float.bad{color:var(--bug)}
+.float.good{color:var(--ok)}
+@keyframes up{to{transform:translateY(-50px);opacity:0}}
+.toast{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:7;padding:10px 18px;border-radius:12px;background:rgba(17,19,43,.85);border:1px solid var(--line);
+  font-family:var(--f-display);font-size:clamp(18px,2.6vw,26px);white-space:nowrap;pointer-events:none;animation:toast 1.4s forwards}
+.toast.bugfix{border-color:var(--bug);color:#ffe3e8}
+@keyframes toast{0%{opacity:0;transform:translate(-50%,-30%)}15%,75%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-70%)}}
+
+/* 버그왕 */
+.boss{position:absolute;top:6px;left:0;z-index:4;display:flex;flex-direction:column;align-items:center;gap:4px;will-change:transform}
+.boss .nm{font-family:var(--f-display);font-size:15px;padding:2px 10px;border-radius:8px;background:rgba(0,0,0,.45);white-space:nowrap}
+.boss .hpb{width:100%;min-width:90px;height:9px;border-radius:5px;background:rgba(0,0,0,.5);overflow:hidden;border:1px solid rgba(255,255,255,.25)}
+.boss .hpb div{height:100%;background:linear-gradient(90deg,var(--bug),var(--sun));transition:width .25s}
+.boss canvas{image-rendering:pixelated;display:block;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5))}
+.boss .body{animation:bob 1.2s ease-in-out infinite}
+.boss.hurt canvas{animation:hurt .3s}
+.boss.defeat{animation:defeat 1.1s forwards}
+@keyframes bob{50%{transform:translateY(5px)}}
+@keyframes hurt{0%,100%{filter:none}30%{filter:brightness(3) saturate(0)}60%{transform:translateX(-6px)}}
+@keyframes defeat{30%{filter:brightness(3)}100%{opacity:0;transform:scale(1.6) rotate(12deg)}}
+
+/* ---------- 입력 ---------- */
+.entry{display:flex;flex-wrap:wrap;gap:10px;padding-top:10px;align-items:stretch}
+.answer{flex:0 0 150px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;background:var(--paper);color:var(--paper-ink);font-family:var(--f-display);font-size:38px;min-height:56px;font-variant-numeric:tabular-nums}
+.answer .ph{font-size:18px;color:#9b93b8}
+.answer.bad{animation:shake .35s;background:#ffd5dc}
+.answer.good{background:#d8f8e4}
+.pad{flex:1 1 300px;display:grid;grid-template-columns:repeat(13,1fr);gap:6px;min-width:0}
+.pad button{border:0;border-radius:10px;min-height:48px;background:var(--ink-1);font-family:var(--f-display);font-size:22px;box-shadow:0 3px 0 #0b0d22}
+.pad button:active{transform:translateY(2px);box-shadow:none}
+.pad .go{grid-column:span 2;background:var(--sun);color:var(--sun-ink)}
+.pad .del{background:var(--ink-2);font-size:16px}
+.hint{font-size:13px;color:var(--muted);padding-top:6px}
+@media (max-width:640px){
+  .pad{grid-template-columns:repeat(7,1fr)}
+  .pad .go{grid-column:span 3}
+  .lives{font-size:20px}
+  .hud .stg small{display:none}
+  .prog{order:5;flex-basis:100%}
+  .answer{flex:1 1 100%;min-height:50px}
+  .hint{display:none}
+  .score{margin-left:0}
+}
+
+/* ---------- 오버레이 ---------- */
+.ov{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:rgba(8,9,24,.72)}
+.card{width:min(460px,100%);max-height:100%;overflow:auto;padding:24px;border-radius:20px;background:var(--ink-1);border:2px solid var(--line);text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;animation:cardin .3s}
+@keyframes cardin{from{transform:scale(.85);opacity:0}}
+.card h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(28px,5vw,40px);text-wrap:balance}
+.card p{margin:0;color:var(--muted);line-height:1.5}
+.card canvas{image-rendering:pixelated}
+.card .say{font-family:var(--f-display);font-size:20px;color:#ffe3e8;background:var(--bug-deep);border:1px solid var(--bug);padding:8px 14px;border-radius:12px}
+.banner{background:transparent;border:0}
+.banner h2{font-size:clamp(44px,9vw,84px);color:var(--sun);text-shadow:0 4px 0 rgba(0,0,0,.4)}
+.btn{border:0;border-radius:12px;min-height:48px;padding:0 22px;font-family:var(--f-display);font-size:20px;background:var(--sun);color:var(--sun-ink);box-shadow:0 4px 0 #b88a14}
+.btn.ghost{background:var(--ink-2);color:var(--text);box-shadow:0 4px 0 #0b0d22}
+.btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+
+/* ---------- 결과 ---------- */
+.res-head{text-align:center;padding-block:16px 6px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.res-head h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(30px,5.5vw,48px);text-wrap:balance}
+.res-head .big{font-family:var(--f-display);font-size:clamp(40px,8vw,64px);color:var(--sun);font-variant-numeric:tabular-nums;line-height:1}
+.res-head .new{font-size:14px;color:var(--ink-0);background:var(--ok);padding:3px 10px;border-radius:20px}
+.stats{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.stats span{padding:6px 12px;border-radius:10px;background:var(--ink-1);font-size:14px;font-variant-numeric:tabular-nums}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;padding-block:14px}
+.box{padding:16px;border-radius:16px;background:var(--ink-1);min-width:0}
+.box h3{margin:0 0 4px;font-family:var(--f-display);font-weight:400;font-size:22px}
+.box > p{margin:0 0 10px;color:var(--muted);font-size:14px;line-height:1.5}
+.box.debug{border:2px solid var(--bug)}
+.fixlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}
+.fixlist li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--bug-deep);font-family:var(--f-display);font-size:19px;font-variant-numeric:tabular-nums}
+.fixlist s{color:var(--bug);text-decoration-thickness:2px}
+.fixlist .ok{color:var(--ok)}
+.fixlist .n{font-family:var(--f-body);font-size:12px;color:var(--muted);min-width:22px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips span{padding:8px 12px;border-radius:10px;background:var(--paper);color:var(--paper-ink);font-family:var(--f-display);font-size:19px}
+.chips span small{font-family:var(--f-body);font-size:12px;color:#7b7399;margin-left:6px}
+.empty{color:var(--muted);font-size:14px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- 시작 화면 -->
+  <nav class="steps" id="steps" aria-label="단계">
+    <button type="button" id="stepStory" data-go="story"><span class="no">1</span>버그 이야기</button>
+    <button type="button" id="stepPractice" data-go="practice"><span class="no">2</span>단별 연습</button>
+    <button type="button" id="stepSetup" data-go="setup"><span class="no">3</span>대작전 준비</button>
+    <button type="button" id="stepGame" data-go="game"><span class="no">▶</span>대작전 시작</button>
+  </nav>
+  <section class="screen scroll" id="scrStory">
+    <div class="hero">
+      <h1>구구단 <span class="b">버그</span> <span class="x">대작전</span></h1>
+      <p>하늘에서 구구단이 떨어져요. 답을 입력해 터뜨리고, 계산을 틀린 버그 문제는 고쳐 주세요. 점수를 모으면 버그왕이 나타나요. 버그왕은 모두 세 명!</p>
+    </div>
+
+    <div class="label">버그와 디버깅 이야기</div>
+    <div class="story" id="story">
+      <div class="st-art" id="stArt"></div>
+      <div class="st-txt">
+        <div class="st-step" id="stStep">이야기 1 / 8</div>
+        <h3 id="stTitle"></h3>
+        <p id="stBody"></p>
+        <div class="st-nav">
+          <button class="btn ghost" id="stPrev" type="button">이전</button>
+          <div class="dots" id="stDots"></div>
+          <button class="btn" id="stNext" type="button">다음</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="choose">
+      <p>이야기를 다 들었나요? 무엇을 할지 골라요!</p>
+      <div class="choose-row">
+        <button class="pick" id="toPractice" type="button"><span class="pk-ic">📒</span><b>구구단 단별 연습</b><span>아직 헷갈리는 단을 차근차근 연습해요</span></button>
+        <button class="pick game" id="toSetup" type="button"><span class="pk-ic">🐞</span><b>버그 대작전</b><span>3단계까지 버그왕과 대결해요</span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen scroll" id="scrPractice" hidden>
+    <div class="label">구구단 단별 연습</div>
+    <div class="pr-dans" id="prDans"></div>
+    <div class="pr-grid">
+      <div class="box pr-table">
+        <div class="pr-head"><h3 id="prTitle">2단 외우기</h3><button class="btn ghost sm" id="prAll" type="button">답 모두 보기</button></div>
+        <p class="pr-tip">줄을 누르면 답과 더하기 풀이가 보여요. 곱하기는 같은 수를 여러 번 더하는 <b>반복</b>이에요!</p>
+        <div class="pr-rows" id="prRows"></div>
+      </div>
+      <div class="box pr-quiz">
+        <div id="prStart">
+          <h3>연습 문제</h3>
+          <p class="pr-tip">외운 것을 확인해 봐요. 틀려도 괜찮아요. 힌트를 보고 다시 풀면 돼요.</p>
+          <div class="btns" style="justify-content:flex-start"><button class="btn" id="prOrder" type="button">순서대로 풀기</button><button class="btn ghost" id="prRandom" type="button">섞어서 풀기</button></div>
+        </div>
+        <div id="prRun" hidden>
+          <div class="pr-dots" id="prDots"></div>
+          <div class="pr-q" id="prQ">2 × 3 = ?</div>
+          <div class="answer pr-ans" id="prAns"><span class="ph">답 입력</span></div>
+          <div class="pr-fb" id="prFb">숫자를 입력하고 확인(또는 스페이스바)을 눌러요</div>
+          <div class="pad pr-pad" id="prPad"></div>
+        </div>
+        <div id="prDone" hidden>
+          <div class="pr-stars" id="prStars">⭐⭐⭐</div>
+          <h3 id="prDoneTitle">2단 연습 끝!</h3>
+          <p class="pr-tip" id="prDoneText"></p>
+          <div class="btns" style="justify-content:flex-start"><button class="btn" id="prAgain" type="button">한 번 더</button><button class="btn ghost" id="prNextDan" type="button">다음 단 연습</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="gonext"><button class="btn" id="prToGame" type="button">대작전 하러 가기 →</button></div>
+  </section>
+
+  <section class="screen scroll" id="scrSetup" hidden>
+    <div class="label">대작전 준비</div>
+    <div class="setup">
+      <div class="setup-head">
+        <div><h3>단계마다 단이 늘어나요</h3><p>쉬운 단부터 시작해서 단계를 통과할수록 어려운 단이 섞여 나와요.</p></div>
+      </div>
+      <div class="road" id="road"></div>
+      <div class="speed-row">
+        <div class="tt">떨어지는 속도</div>
+        <div class="speeds" id="speeds"></div>
+      </div>
+    </div>
+
+    <div class="label">이런 문제가 떨어져요</div>
+    <div class="legend">
+      <div class="lg"><div class="face"><span class="q">6 × 4</span></div><p><b>보통 문제</b>답을 입력하면 펑! 바닥에 닿으면 ♥ 하나가 줄어요.</p></div>
+      <div class="lg"><div class="face t-fast"><span class="tag">⚡ 번개</span><span class="q">3 × 7</span></div><p><b>번개 문제</b>두 배로 빨리 떨어져요. 잡으면 점수 두 배!</p></div>
+      <div class="lg"><div class="face t-bug"><canvas id="lgBug"></canvas><span class="q">5 × 6 = <b class="bad">35</b></span></div><p><b>버그 문제</b>컴퓨터가 계산을 틀렸어요. 맞는 답(30)을 입력해 고치는 것이 <b style="display:inline;font-size:inherit">디버깅</b>이에요.</p></div>
+      <div class="lg"><div class="face t-bomb"><span class="tag">💣 한 번에 펑!</span><span class="q">4 × 6</span></div><p><b>폭탄 문제</b>버그왕이 나왔을 때만 떨어져요. 맞히면 화면의 문제가 한 번에 터지고 왕에게 큰 피해!</p></div>
+      <div class="lg"><div class="face t-heart"><span class="tag">♥ +1</span><span class="q">2 × 9</span></div><p><b>생명 문제</b>맞히면 생명이 하나 늘어나요.</p></div>
+    </div>
+
+    <div class="label">설정</div>
+    <div class="toggles">
+      <button type="button" class="tg" id="tgBug" data-key="bugPenalty" role="switch"><span class="ic">🐞</span><span class="tx">버그 놓치면 ♥ 줄기</span><span class="sw"></span></button>
+      <button type="button" class="tg" id="tgWrong" data-key="wrongMode" role="switch"><span class="ic">✖️</span><span class="tx">틀리면 ♥ 줄기</span><span class="sw"></span></button>
+      <button type="button" class="tg" id="tgSound" data-key="sound" role="switch"><span class="ic">🔊</span><span class="tx">효과음</span><span class="sw"></span></button>
+    </div>
+    <div class="startbar">
+      <div class="sum" id="startSum"></div>
+      <button class="btn" id="btnStart" type="button">대작전 시작</button>
+    </div>
+  </section>
+
+  <!-- 게임 화면 -->
+  <section class="screen" id="scrGame" hidden>
+    <div class="hud" id="hud">
+      <div class="lives" id="lives" aria-label="생명"></div>
+      <div class="stg" id="stg">1단계</div>
+      <div class="prog"><span id="progLbl">버그왕까지</span><div class="tr"><div class="fl" id="progFill"></div></div></div>
+      <div class="score" id="score">0</div>
+      <button class="ibtn" id="btnSound" type="button" aria-label="효과음 켜기/끄기">🔇</button>
+      <button class="ibtn" id="btnPause" type="button">멈춤</button>
+    </div>
+    <div class="field s1" id="field"><div class="floor" id="floor"></div></div>
+    <div class="entry">
+      <div class="answer" id="answer"><span class="ph">답 입력</span></div>
+      <div class="pad" id="pad"></div>
+    </div>
+    <div class="hint">키보드 숫자로 입력하고 Enter 또는 스페이스바로 답 보내기 · Esc로 멈춤</div>
+  </section>
+
+  <!-- 결과 화면 -->
+  <section class="screen scroll" id="scrResult" hidden></section>
+</div>
+
+<div class="ov" id="ov" hidden><div class="card" id="ovCard"></div></div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const field = $('#field'), floorEl = $('#floor');
+
+/* ---------- 데이터 ---------- */
+// 단별 난이도: 2~5단 하, 6~7단 중, 8~9단 고
+const TIERS = {
+  easy:{lv:'하', color:'var(--easy)', pal:{b:'#7ed957',d:'#3c8a36',h:'#c9f7aa'}},
+  mid: {lv:'중', color:'var(--mid)',  pal:{b:'#ff9f43',d:'#b85a22',h:'#ffd8a8'}},
+  hard:{lv:'고', color:'var(--hard)', pal:{b:'#b48cff',d:'#5d3aa8',h:'#e2d3ff'}},
+};
+const danTier = d => d<=5 ? 'easy' : d<=7 ? 'mid' : 'hard';
+// 스테이지별 단: 1 → 2~5단, 2 → 2~7단, 3 → 2~9단
+const STAGE_DANS = [[2,3,4,5],[2,3,4,5,6,7],[2,3,4,5,6,7,8,9]];
+const STAGE_TIER = ['easy','mid','hard'];
+const SPEEDS = {
+  slow:  {name:'🌱 초급 (천천히)', short:'초급', f:1.35},
+  normal:{name:'🚀 보통 (추천)',   short:'보통', f:1.0},
+  fast:  {name:'⚡ 달인 (빠름)', short:'달인', f:0.75},
+};
+const KINGS = {
+  easy:['꼬물 버그왕','왕눈이 버그왕','날개 버그 대왕'],
+  mid: ['불꽃 버그왕','뿔난 버그왕','폭풍 버그 대왕'],
+  hard:['그림자 버그왕','독침 버그왕','최강 버그 황제'],
+};
+const KING_SAY = ['내 버그 계산을 막을 수 있을까?','버그를 더 많이 퍼뜨려 주마!','모든 계산을 틀리게 만들겠다!'];
+// 20분 수업 기준: 스테이지마다 약 5~6분. 오를수록 더 빨리, 더 자주, 버그가 더 크게
+const STAGES = [
+  {target:300,  fall:12,  spawn:2.6, max:5, bug:0.13, hp:15, thr:2.6, bmax:3, bugPx:4},
+  {target:400,  fall:10,  spawn:2.2, max:6, bug:0.17, hp:18, thr:2.4, bmax:3, bugPx:5},
+  {target:500,  fall:8.5, spawn:1.9, max:7, bug:0.21, hp:22, thr:2.1, bmax:3, bugPx:6},
+];
+const PTS = {normal:10, fast:20, bug:30, heart:10, boss:20, bomb:30};
+
+/* ---------- 픽셀 스프라이트 (왼쪽 절반만 적고 좌우 대칭) ---------- */
+const KING_ART = [
+ ["....c.c.","....cccc","..l..ddd","...lbbbb","..bbeebb","..bbepbb",".bbbbbbb","lbbhbbbd",".bbbbbbd","lbbbbbbd",".bbbbbbd","..bbbbbd",".l..l..."],
+ ["..c..c.c","..cccccc","d..ddddd",".d.bbbbb","..dbeebb","..bbepbb","..bbbbbb","l.bbbbbb",".lbbhbbd","l.bbbbbd",".lbbbbbd","l.bbbbbd",".lbbbbbd","...bbbbd","..l..l.."],
+ [".c.c.c.c",".ccccccc",".ccgcccg","d..ddddd","dd.bbbbb",".dbbeebb","..bbeppb","w.bbbbbb","wwbbbbbb","wwbbmmmm","wwbbbbbd","wlbbhbbd","w.bbbbbd",".lbbbbbd","l.bbbbbd",".l.bbbbd","..l..l.."],
+];
+const BUG_ART = ["l...",".bbb","bepb","bbbd","lbbd","bbbd",".l.l"];
+const BUG_PAL = {b:'#ff5d73',d:'#b8234a',h:'#ffb3c0',l:'#ff8fa0',e:'#ffffff',p:'#2a0d1a'};
+const MOTH_ART = [".....l..","......l.","ww....dd","wwww..dd","wwwwwddd","wwwhwwdd","wwwwwwdd",".wwwwwdd","..wwwwdd","...ww.dd","......dd",".......d"];
+const MOTH_PAL = {w:'#d9c69c',h:'#8a7654',d:'#6b5638',l:'#d9c69c'};
+function mirror(rows){ return rows.map(l => l + l.slice(0,-1).split('').reverse().join('')); }
+function paint(ctx, art, pal, px, ox=0, oy=0){
+  const rows = mirror(art);
+  const P = Object.assign({e:'#ffffff',p:'#1b1240',c:'#ffcf4a',g:'#ff4d6d',w:'rgba(190,225,255,.75)',m:'#ffffff'}, pal);
+  if(!P.l) P.l = P.d;
+  rows.forEach((r,y)=>{ for(let x=0;x<r.length;x++){ const ch=r[x]; if(ch!=='.' && P[ch]){ ctx.fillStyle=P[ch]; ctx.fillRect(ox+x*px,oy+y*px,px,px); } } });
+  return {w:rows[0].length*px, h:rows.length*px};
+}
+function drawSprite(cv, art, pal, px){
+  const w = (art[0].length*2-1)*px, h = art.length*px;
+  cv.width = w; cv.height = h;
+  return paint(cv.getContext('2d'), art, pal, px);
+}
+
+/* ---------- 설정 / 기록 ---------- */
+const settings = {bugPenalty:true, wrongMode:'life', sound:true};
+const sel = {speed:'normal', prDan:2};
+try{ Object.assign(settings, JSON.parse(localStorage.getItem('gugu-bug-settings2')||'{}')); }catch(e){}
+try{ const s = JSON.parse(localStorage.getItem('gugu-bug-sel')||'null'); if(s && SPEEDS[s.speed]) sel.speed = s.speed; if(s && s.prDan>=2 && s.prDan<=9) sel.prDan = s.prDan; }catch(e){}
+function saveSettings(){ try{ localStorage.setItem('gugu-bug-settings2', JSON.stringify(settings)); localStorage.setItem('gugu-bug-sel', JSON.stringify(sel)); }catch(e){} }
+const bestKey = speed => 'gugu-bug-best3-'+speed;
+function getBest(speed){ try{ return parseInt(localStorage.getItem(bestKey(speed))||'0',10)||0; }catch(e){ return 0; } }
+function setBest(speed,v){ try{ localStorage.setItem(bestKey(speed), String(v)); }catch(e){} }
+function dansLabel(dans){
+  const d=[...dans].sort((a,b)=>a-b);
+  if(d.length===1) return d[0]+'단';
+  const contiguous = d.every((v,i)=>i===0||v===d[i-1]+1);
+  return contiguous ? `${d[0]}~${d[d.length-1]}단` : d.join('·')+'단';
+}
+
+/* ---------- 효과음 ---------- */
+let actx = null;
+function tone(freqs, dur=0.08, type='square', vol=0.045){
+  if(!settings.sound) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const t0 = actx.currentTime;
+    freqs.forEach((f,i)=>{
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(vol, t0+i*dur);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+(i+1)*dur);
+      o.connect(g).connect(actx.destination);
+      o.start(t0+i*dur); o.stop(t0+(i+1)*dur+0.02);
+    });
+  }catch(e){}
+}
+const SFX = {
+  ok:()=>tone([660,880],0.06), fix:()=>tone([523,659,784,1047],0.07), wrong:()=>tone([170],0.2,'sawtooth',0.04),
+  crash:()=>tone([160,110],0.1,'triangle',0.07), heart:()=>tone([700,900,1200],0.06,'sine',0.06),
+  boss:()=>tone([320,220],0.08,'square',0.05), clear:()=>tone([523,659,784,1047,1319],0.1,'triangle',0.06), lose:()=>tone([392,330,262,196],0.15,'triangle',0.06)
+};
+
+/* ---------- 버그 이야기 ---------- */
+function drawRelays(cv, withMoth){
+  const W=360, H=210; cv.width=W; cv.height=H;
+  const c=cv.getContext('2d');
+  c.fillStyle='#2a2f52'; c.fillRect(0,0,W,H);
+  c.fillStyle='#3a4170'; for(let y=0;y<H;y+=70) c.fillRect(0,y+62,W,4);
+  for(let r=0;r<3;r++) for(let k=0;k<6;k++){
+    const x=14+k*58, y=10+r*70;
+    c.fillStyle='#8f99c2'; c.fillRect(x,y,44,46);           // 릴레이 몸통
+    c.fillStyle='#c9853a'; c.fillRect(x+6,y+8,14,30);        // 구리 코일
+    c.fillStyle='#e0a35a'; for(let i=0;i<5;i++) c.fillRect(x+6,y+10+i*6,14,2);
+    c.fillStyle='#d8dcef'; c.fillRect(x+24,y+12,16,4); c.fillRect(x+24,y+28,16,4); // 접점
+    c.fillStyle='#1a1d36'; c.fillRect(x+34,y+16,3,12);
+  }
+  // 전선
+  c.strokeStyle='#ff5d73'; c.lineWidth=2; c.beginPath(); c.moveTo(0,200); c.bezierCurveTo(120,180,240,215,360,195); c.stroke();
+  if(withMoth){
+    const x=14+2*58, y=10+70;
+    c.strokeStyle='#ffcf4a'; c.lineWidth=3; c.beginPath(); c.arc(x+32,y+22,34,0,Math.PI*2); c.stroke();
+    paint(c, MOTH_ART, MOTH_PAL, 3, x+10, y+6);
+  }
+}
+const STORY = [
+  {t:'옛날 컴퓨터는 방만큼 컸어요',
+   d:'1947년 미국 하버드 대학교에는 <b>마크 Ⅱ</b>라는 컴퓨터가 있었어요. 방 하나를 가득 채울 만큼 컸고, 안에는 딸깍딸깍 붙었다 떨어지는 작은 <b>부품</b>이 아주 많았어요.',
+   art:el=>{ el.innerHTML='<canvas aria-label="부품이 가득한 옛날 컴퓨터 그림"></canvas>'; drawRelays(el.firstChild,false); }},
+  {t:'부품 사이에 진짜 벌레가!',
+   d:'1947년 9월 9일, 컴퓨터가 이상하게 움직여서 연구원들이 안을 살펴봤어요. 그랬더니 부품 사이에 <b>나방 한 마리</b>가 끼어 있었어요.',
+   art:el=>{ el.innerHTML='<canvas aria-label="부품 사이에 낀 나방 그림"></canvas>'; drawRelays(el.firstChild,true); }},
+  {t:'기록장에 나방을 붙였어요',
+   d:'연구원들은 나방을 꺼내 작업 기록장에 테이프로 붙이고 “버그(벌레)를 <b>진짜로</b> 발견한 첫 번째 사례”라고 적었어요. 이 기록장은 지금도 미국 <b>스미스소니언 박물관</b>에 있어요.',
+   art:el=>{ el.innerHTML=`<div class="logbook"><div class="ln"><small>9/9</small> 15:45 Relay #70 Panel F</div>
+      <div class="ln"><span class="tape"><canvas></canvas></span><span class="hand">(moth) in relay.</span></div>
+      <div class="ln hand">First actual case of bug being found.</div>
+      <div class="ko">↑ 실제 기록장에 적힌 글: “부품 사이에 나방. 버그를 진짜로 발견한 첫 사례.”</div></div>`;
+     drawSprite(el.querySelector('canvas'), MOTH_ART, MOTH_PAL, 2); }},
+  {t:'‘버그’라는 말은 더 오래됐어요',
+   d:'사실 발명가 <b>에디슨</b>도 1870년대에 기계의 작은 문제를 ‘버그’라고 불렀어요. 이 팀에서 컴퓨터 프로그램을 만들던 <b>그레이스 호퍼</b>가 나방 이야기를 즐겨 들려주면서, ‘버그’라는 말이 컴퓨터 세상에서 더 유명해졌어요.',
+   art:el=>{ el.innerHTML=`<div class="tl"><div><b>1870년대</b><span>에디슨: 기계의 작은 문제를 ‘버그’라고 부름</span></div>
+      <div><b>1947년</b><span>마크 Ⅱ 컴퓨터에서 진짜 나방 발견</span></div>
+      <div><b>오늘</b><span>프로그램이 틀리게 움직이는 잘못 = 버그</span></div></div>`; }},
+  {t:'디버깅 = 버그를 찾아 고치는 일',
+   d:'컴퓨터 프로그램이 틀리게 움직이는 잘못을 <b>버그</b>라고 해요. 그 잘못을 <b>찾아서 고치는 일</b>을 <b>디버깅</b>이라고 해요. 이 말은 지금도 프로그램을 만드는 사람들이 매일 쓰는 말이에요.',
+   art:el=>{ el.innerHTML=`<div class="define">
+      <div class="dfn bug"><span class="big">🐞</span><b>버그</b><span>프로그램의 잘못</span></div>
+      <div class="dfn-steps"><span>🔍 찾기</span><span class="ar">→</span><span>🔧 고치기</span></div>
+      <div class="dfn fix"><span class="big">✅</span><b>디버깅</b><span>버그를 찾아 고치는 일</span></div></div>`; }},
+  {t:'코딩할 때 생기는 버그',
+   d:'로봇을 별까지 보내려고 <b>앞으로 3칸</b> 블록을 넣었는데, 로봇이 별 바로 앞에서 멈췄어요. 이게 바로 <b>버그</b>예요. 칸을 다시 세어 보고 <b>앞으로 4칸</b>으로 바꾸니 별에 도착! 이렇게 고치는 게 <b>디버깅</b>이에요. 코들리에서 블록을 고쳐 본 적 있죠? 그때 여러분도 디버깅을 한 거예요.',
+   art:el=>{ el.innerHTML=`<div class="codefix">
+      <div class="grid5"><span class="robot">🤖</span><span></span><span></span><span class="stop">멈춤!</span><span class="star">⭐</span></div>
+      <div class="cols"><div class="col"><small>버그가 있는 코드</small><div class="cb">▶ 시작하기</div><div class="cb bad">앞으로 3칸</div></div>
+      <div class="to">→</div>
+      <div class="col"><small>디버깅한 코드</small><div class="cb">▶ 시작하기</div><div class="cb good">앞으로 4칸</div></div></div></div>`; }},
+  {t:'생활 속에도 버그가 있어요',
+   d:'아침에 급해서 <b>신발을 먼저</b> 신었더니 양말을 못 신었어요. 순서가 틀린 <b>버그</b>예요! 신발을 벗고 <b>양말부터</b> 신으면 디버깅 성공. 장난감 자동차가 움직이지 않을 때 “왜 안 되지?” 하고 살펴보니 건전지가 거꾸로 들어가 있었어요. 바르게 넣으니 부릉부릉! 원인을 찾아 고치는 것도 디버깅이에요.<br><b>생각해 보기:</b> 나는 어떤 버그를 고쳐 봤나요?',
+   art:el=>{ el.innerHTML=`<div class="lifefix">
+      <div class="lf"><small>🐞 버그</small><ol><li>신발 신기 👟</li><li>양말 신기 🧦 … 안 들어가요!</li></ol></div>
+      <div class="lf ok"><small>🔧 디버깅</small><ol><li>양말 신기 🧦</li><li>신발 신기 👟 … 완성!</li></ol></div>
+      <div class="lf"><small>🐞 버그</small><p>🚗 장난감 자동차가 움직이지 않아요</p></div>
+      <div class="lf ok"><small>🔧 디버깅</small><p>🔋 거꾸로 넣은 건전지를 바르게 넣었더니 부릉부릉!</p></div></div>`; }},
+  {t:'오늘은 내가 디버깅 대장!',
+   d:'오늘 대작전의 빨간 <b>버그 문제</b>는 계산을 틀린 컴퓨터예요. 구구단 실력으로 맞는 답을 넣어서 컴퓨터의 버그를 고쳐 주세요. 대작전이 끝나면 내가 고친 버그가 <b>디버깅 기록</b>에 모두 남아요!',
+   art:el=>{ el.innerHTML=`<div class="demo"><div class="face t-bug"><canvas></canvas><span class="q">7 × 8 = <b class="bad">54</b></span><span class="tag">고쳐 줘!</span></div>
+      <div class="arrow">56 입력 ↓</div><div class="fixed">버그 수정! 7 × 8 = 56</div></div>`;
+     drawSprite(el.querySelector('canvas'), BUG_ART, BUG_PAL, 4); }},
+];
+let storyI = 0;
+function renderStory(){
+  const s = STORY[storyI];
+  $('#stStep').textContent = `이야기 ${storyI+1} / ${STORY.length}`;
+  $('#stTitle').textContent = s.t;
+  $('#stBody').innerHTML = s.d;
+  s.art($('#stArt'));
+  $('#stDots').innerHTML = STORY.map((_,i)=>`<button type="button" aria-label="이야기 ${i+1}" aria-current="${i===storyI}" data-i="${i}"></button>`).join('');
+  $('#stDots').querySelectorAll('button').forEach(b=>b.onclick=()=>{ storyI=+b.dataset.i; renderStory(); });
+  $('#stPrev').disabled = storyI===0;
+  $('#stNext').textContent = storyI===STORY.length-1 ? '무엇을 할까? ↓' : '다음';
+}
+$('#stPrev').onclick = ()=>{ if(storyI>0){ storyI--; renderStory(); } };
+$('#stNext').onclick = ()=>{
+  if(storyI<STORY.length-1){ storyI++; renderStory(); }
+  else document.querySelector('.choose').scrollIntoView({behavior:'smooth', block:'center'});
+};
+
+/* ---------- 시작 화면: 단수 / 속도 설정 ---------- */
+function renderSetup(){
+  $('#road').innerHTML = STAGE_DANS.map((d,i)=>{
+    const t=TIERS[STAGE_TIER[i]];
+    return `<div class="rd" style="--tc:${t.color}"><span class="rd-st">${i+1}단계</span><b>${dansLabel(d)}</b><span class="rd-k">버그왕 · ${KINGS[STAGE_TIER[i]][i]}</span></div>`;
+  }).join('<span class="rd-ar">→</span>');
+  $('#speeds').innerHTML = Object.entries(SPEEDS).map(([k,v])=>`<button type="button" id="spd-${k}" data-s="${k}" aria-pressed="${sel.speed===k}">${v.name}</button>`).join('');
+  $('#speeds').querySelectorAll('button').forEach(b=>b.onclick=()=>{ sel.speed=b.dataset.s; saveSettings(); renderSetup(); });
+  // 설정 스위치: 켬/끔
+  const isOn = k => k==='wrongMode' ? settings.wrongMode==='life' : !!settings[k];
+  document.querySelectorAll('.tg').forEach(t=>{
+    const k=t.dataset.key;
+    t.setAttribute('aria-checked', String(isOn(k)));
+    t.onclick = ()=>{
+      if(k==='wrongMode') settings.wrongMode = isOn(k) ? 'speed' : 'life';
+      else settings[k] = !settings[k];
+      saveSettings(); renderSetup(); if(k==='sound' && settings.sound) SFX.ok();
+    };
+  });
+  const best = getBest(sel.speed);
+  $('#startSum').innerHTML = `<b>2~9단 · 3단계</b> · ${SPEEDS[sel.speed].short} 속도<br><span style="color:var(--muted);font-size:13px">${best?'이 속도의 내 최고 기록 '+best+'점':'이 속도로는 아직 기록이 없어요'}</span>`;
+}
+$('#btnStart').onclick = ()=>startGame();
+drawSprite($('#lgBug'), BUG_ART, BUG_PAL, 3);
+
+/* ---------- 숫자 패드 ---------- */
+const padKeys = ['1','2','3','4','5','6','7','8','9','0','del','go'];
+$('#pad').innerHTML = padKeys.map(k=> k==='del' ? '<button type="button" class="del" data-k="del" aria-label="지우기">지우기</button>'
+  : k==='go' ? '<button type="button" class="go" data-k="go">확인</button>' : `<button type="button" data-k="${k}">${k}</button>`).join('');
+$('#pad').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.k; if(k==='del') delDigit(); else if(k==='go') submit(); else addDigit(k);
+});
+
+/* ---------- 게임 상태 ---------- */
+let S = null, uid = 0;
+function show(id){
+  ['#scrStory','#scrPractice','#scrSetup','#scrGame','#scrResult'].forEach(s=>$(s).hidden = (s!==id));
+  const menu = ['#scrStory','#scrPractice','#scrSetup'].includes(id);
+  $('#steps').hidden = !menu;
+  $('#stepStory').setAttribute('aria-current', String(id==='#scrStory'));
+  $('#stepPractice').setAttribute('aria-current', String(id==='#scrPractice'));
+  $('#stepSetup').setAttribute('aria-current', String(id==='#scrSetup'));
+  if(menu) $(id).scrollTop = 0;
+}
+document.querySelectorAll('#steps button').forEach(b=>b.onclick=()=>{
+  const g=b.dataset.go;
+  if(g==='story') show('#scrStory');
+  else if(g==='practice') openPractice();
+  else if(g==='setup'){ renderSetup(); show('#scrSetup'); }
+  else startGame();
+});
+
+// carry: 이어하기(스테이지부터 다시) 때 이전 기록을 이어받음
+function startGame(carry){
+  clearField();
+  const base = carry || {speed:sel.speed, stage:0, score:0, fixed:[], miss:{}, correct:0, wrong:0};
+  S = {dans:STAGE_DANS[0], speed:base.speed, tier:'easy', stage:0, score:base.score, stageStartScore:base.score,
+       stagePts:0, lives:5, maxLives:7, blocks:[], boss:null, phase:'play',
+       spawnT:1.2, spawned:0, input:'', fixed:base.fixed, miss:base.miss, correct:base.correct, wrong:base.wrong, boostT:0,
+       running:true, paused:false, hold:false, stageFixed:0, waveDone:false, waveQueue:0, waveT:0};
+  show('#scrGame');
+  updateSoundBtn();
+  renderInput();
+  startStage(base.stage);
+}
+function clearField(){ field.querySelectorAll('.blk,.boss,.float,.toast').forEach(e=>e.remove()); }
+
+function startStage(n){
+  const g = S;
+  S.stage = n; S.dans = STAGE_DANS[n]; S.tier = STAGE_TIER[n]; S.stagePts = 0; S.phase = 'play'; S.spawnT = 1.4; S.spawned = 0; S.stageFixed = 0;
+  S.stageStartScore = S.score; S.waveDone = false; S.waveQueue = 0;
+  S.blocks.forEach(b=>b.el.remove()); S.blocks = [];
+  if(S.boss){ S.boss.el.remove(); S.boss = null; }
+  field.className = 'field s'+(n+1);
+  updateHUD();
+  const sub = ['버그들이 내려오기 시작했어요!','6단·7단이 섞여 나와요! 버그도 더 커졌어요!','마지막 단계! 8단·9단까지 모두 나와요!'][n];
+  openOverlay(`<h2>${n+1}단계</h2><p><b style="color:var(--sun)">${dansLabel(STAGE_DANS[n])}</b> · ${sub}<br>버그왕까지 ${STAGES[n].target}점</p>`, true, true);
+  setTimeout(()=>{ if(S===g && S.running) closeOverlay(); }, 1800);
+}
+
+/* ---------- 문제 만들기 ---------- */
+function rnd(n){ return Math.floor(Math.random()*n); }
+function makeProblem(){
+  const dans = S.dans;
+  const onScreen = new Set(S.blocks.filter(b=>!b.dead).map(b=>b.ans));
+  let a,b;
+  for(let i=0;i<8;i++){ a = dans[rnd(dans.length)]; b = 2+rnd(8); if(!onScreen.has(a*b)) break; }
+  return [a,b];
+}
+function wrongValue(a,b){
+  const ans=a*b, opts=[ans+a, ans-a, ans+1, ans-1, ans+2, ans-2, ans+10, ans-10];
+  if(ans>=10){ const s=String(ans).split('').reverse().join(''); if(s[0]!=='0' && +s!==ans) opts.push(+s, +s); }
+  const ok = opts.filter(v=>v>0 && v!==ans && v<100);
+  return ok[rnd(ok.length)];
+}
+// 스테이지 안에서도 점수가 오를수록 조금씩 빨라짐
+function progress(){ return S.phase==='play' ? Math.min(1, S.stagePts/STAGES[S.stage].target) : 0.6; }
+
+/* ---------- 블록 ---------- */
+function makeBlock(type, opt={}){
+  const st = STAGES[S.stage], f = SPEEDS[S.speed].f;
+  const [a,b] = opt.problem || makeProblem(), ans = a*b;
+  const el = document.createElement('div'); el.className = 'blk';
+  const face = document.createElement('div'); face.className = 'face t-'+type;
+  let wrongV = null;
+  if(type==='bug'){
+    wrongV = wrongValue(a,b);
+    face.innerHTML = `<canvas></canvas><span class="q">${a} × ${b} = <b class="bad">${wrongV}</b></span><span class="tag">고쳐 줘!</span>`;
+    drawSprite(face.querySelector('canvas'), BUG_ART, BUG_PAL, st.bugPx);
+  } else {
+    const tag = {fast:'⚡ 번개', heart:'♥ +1', boss:'👑 왕의 문제', bomb:'💣 한 번에 펑!'}[type];
+    face.innerHTML = (tag?`<span class="tag">${tag}</span>`:'') + `<span class="q">${a} × ${b}</span>`;
+  }
+  el.appendChild(face); field.appendChild(el);
+  const W = field.clientWidth, w = el.offsetWidth, h = el.offsetHeight;
+  let x;
+  if(opt.cx!=null){
+    const px = Math.max(0, Math.min(W-w, opt.cx - w/2 + (Math.random()*80-40)));
+    x = (W-w)>0 ? px/(W-w) : 0;
+  } else {
+    let bestX=Math.random(), bestD=-1;
+    const tops = S.blocks.filter(o=>!o.dead && o.y<0.4);
+    for(let i=0;i<8;i++){
+      const c = Math.random(); let d = 2;
+      tops.forEach(o=>{ d = Math.min(d, Math.abs(o.x-c)); });
+      if(d>bestD){ bestD=d; bestX=c; }
+    }
+    x = bestX;
+  }
+  let durMul = {normal:1, fast:0.5, heart:0.9, bug:1.05, boss:0.85, bomb:0.95}[type];
+  const ramp = 1 - 0.2*progress();
+  const blk = {id:++uid, a, b, ans, type, wrongV, el, face, x, y:0, w, h, start:opt.start||0,
+               dur: st.fall*f*durMul*ramp, boss:!!opt.boss, dead:false, px:0, py:0};
+  S.blocks.push(blk);
+  placeBlock(blk, W, field.clientHeight);
+  return blk;
+}
+function placeBlock(b, W, H){
+  b.px = b.x*(W-b.w);
+  b.py = b.start + b.y*(H - b.h - 8 - b.start);
+  b.el.style.transform = `translate(${b.px}px,${b.py}px)`;
+}
+function spawnNormal(){
+  const st = STAGES[S.stage]; let type='normal';
+  if(S.spawned>=2){
+    const r=Math.random();
+    if(r<st.bug) type='bug';
+    else if(r<st.bug+0.15) type='fast';
+    else if(r<st.bug+0.35 && S.lives<S.maxLives) type='heart';   // 생명 문제 (예전의 2.5배)
+  }
+  S.spawned++;
+  makeBlock(type);
+}
+function killBlock(b, cls){
+  b.dead = true; b.face.classList.add(cls);
+  setTimeout(()=>b.el.remove(), 480);
+}
+
+/* ---------- 메인 루프 ---------- */
+let last = 0;
+function frame(ts){
+  const dt = Math.min(0.05, (ts-last)/1000 || 0); last = ts;
+  if(S && S.running && !S.paused && !S.hold) update(dt);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function update(dt){
+  const st = STAGES[S.stage], f = SPEEDS[S.speed].f;
+  const W = field.clientWidth, H = field.clientHeight;
+  if(!W || !H) return;
+  let speed = 1;
+  if(S.boostT>0){ speed = 1.8; S.boostT -= dt; }
+
+  if(S.phase==='play'){
+    // 스테이지 절반에서 '버그 떼' 이벤트
+    if(!S.waveDone && progress()>=0.5){
+      S.waveDone = true; S.waveQueue = 3 + S.stage; S.waveT = 1.2;
+      toast('🐞 버그 떼가 몰려와요! 디버깅 준비!','bugfix');
+    }
+    if(S.waveQueue>0){
+      S.waveT -= dt;
+      if(S.waveT<=0){ makeBlock('bug'); S.waveQueue--; S.waveT = 1.0; }
+    } else {
+      S.spawnT -= dt;
+      if(S.spawnT<=0 && S.blocks.filter(b=>!b.dead).length < st.max){
+        spawnNormal(); S.spawnT = st.spawn*f*(1-0.25*progress())*(0.8+Math.random()*0.4);
+      }
+    }
+  } else if(S.phase==='boss' && S.boss){
+    const B = S.boss; B.t += dt;
+    const bw = B.el.offsetWidth;
+    const range = Math.max(0, (W-bw)/2 - 6);
+    B.mv += dt*(B.rage?1.3:0.8);
+    B.cx = W/2 + range*Math.sin(B.mv);
+    B.el.style.transform = `translate(${B.cx - bw/2}px,0)`;
+    const start = B.el.offsetHeight + 10;
+    // 1) 버그 비: 몇 초마다 문제가 우수수
+    B.rainT -= dt;
+    if(B.rainT<=0 && B.rainQ===0){
+      B.rainQ = S.stage===0 ? 2 : 3;   // 같은 문제 2~3개 B.rainGap = 0;
+      B.rainProb = makeProblem();
+      toast(`⚠️ ${B.rainProb[0]} × ${B.rainProb[1]} 비가 쏟아져요! ${B.rainQ}번 입력!`,'bugfix');
+      field.classList.remove('storm'); void field.offsetWidth; field.classList.add('storm');
+      B.rainT = (10 - S.stage) * (B.rage?0.7:1);
+    }
+    if(B.rainQ>0){
+      B.rainGap -= dt;
+      if(B.rainGap<=0){ makeBlock('boss',{boss:true, start, rain:true, problem:B.rainProb}); B.rainQ--; B.rainGap = 0.35; }
+    }
+    // 2) 폭탄 구구단: 맞히면 화면의 블록이 한 번에 펑
+    B.bombT -= dt;
+    if(B.bombT<=0 && !S.blocks.some(b=>!b.dead && b.type==='bomb')){
+      makeBlock('bomb',{boss:true, start}); B.bombT = 9 + Math.random()*3;
+    }
+    // 3) 보통 공격
+    B.throwT -= dt;
+    const active = S.blocks.filter(b=>!b.dead && b.boss).length;
+    if(B.throwT<=0 && active < st.bmax){
+      bossThrow(); B.throwT = st.thr*f*(0.85+Math.random()*0.3);
+    }
+  }
+
+  for(const b of S.blocks){
+    if(b.dead) continue;
+    b.y += dt*speed/b.dur;
+    if(b.y>=1){ b.y=1; placeBlock(b,W,H); crash(b); if(!S.running) return; }
+    else placeBlock(b,W,H);
+  }
+  S.blocks = S.blocks.filter(b=>!b.dead);
+}
+
+/* ---------- 입력 ---------- */
+function renderInput(){
+  $('#answer').innerHTML = S && S.input ? S.input : '<span class="ph">답 입력</span>';
+}
+function addDigit(d){ if(!S||!S.running||S.paused||S.hold) return; if(S.input.length>=2) S.input = S.input.slice(1); S.input += d; if(S.input==='0') S.input=''; renderInput(); }
+function delDigit(){ if(!S) return; S.input = S.input.slice(0,-1); renderInput(); }
+function flashAnswer(cls){ const a=$('#answer'); a.classList.remove('good','bad'); void a.offsetWidth; a.classList.add(cls); setTimeout(()=>a.classList.remove(cls),350); }
+
+function submit(){
+  if(!S||!S.running||S.paused||S.hold||!S.input) return;
+  const v = parseInt(S.input,10); S.input=''; renderInput();
+  const c = S.blocks.filter(b=>!b.dead && b.ans===v).sort((p,q)=>q.y-p.y);
+  if(c.length) hit(c[0]); else wrongAnswer();
+}
+
+function hit(b){
+  killBlock(b,'pop'); S.correct++;
+  const pts = PTS[b.type] || 10;
+  S.score += pts;
+  flashAnswer('good');
+  if(b.type==='bug'){
+    S.fixed.push({a:b.a,b:b.b,wrong:b.wrongV,ans:b.ans}); S.stageFixed++;
+    toast(`🐞 버그 수정! ${b.a} × ${b.b} = ${b.ans}`,'bugfix'); SFX.fix();
+    floatText(b, '+'+pts+' 디버깅!', 'good');
+  } else if(b.type==='heart'){
+    S.lives = Math.min(S.maxLives, S.lives+1); SFX.heart(); floatText(b,'♥ +1','good');
+  } else if(b.type==='bomb'){
+    boom(b);
+  } else { SFX.ok(); floatText(b,'+'+pts); }
+  if(b.boss && b.type!=='heart' && b.type!=='bomb'){
+    S.combo++;
+    let dmg = 1;
+    if(S.combo>0 && S.combo%5===0){ dmg = 2; toast(`🔥 ${S.combo}번 연속! 2배 공격!`); }
+    else if(S.combo>=2) comboText(S.combo);
+    bossHit(dmg);
+  }
+  else if(S.phase==='play'){
+    S.stagePts += pts;
+    if(S.stagePts >= STAGES[S.stage].target) startBoss();
+  }
+  updateHUD();
+}
+// 폭탄: 화면의 모든 블록을 한 번에 터뜨리고, 왕의 문제였던 블록만큼 왕에게 피해
+function boom(b){
+  field.classList.remove('boom'); void field.offsetWidth; field.classList.add('boom');
+  tone([120,90,60],0.12,'sawtooth',0.07);
+  let bossCnt = 0, cnt = 0;
+  S.blocks.forEach(o=>{
+    if(o.dead || o===b) return;
+    killBlock(o,'pop'); cnt++; S.correct++;
+    S.score += PTS[o.type]||10;
+    if(o.type==='bug'){ S.fixed.push({a:o.a,b:o.b,wrong:o.wrongV,ans:o.ans}); S.stageFixed++; }
+    if(o.type==='heart') S.lives = Math.min(S.maxLives, S.lives+1);
+    if(o.boss && o.type!=='heart') bossCnt++;
+    floatText(o,'펑!');
+  });
+  const dmg = Math.min(4, 2 + Math.floor(bossCnt/2));   // 폭탄 피해는 최대 4
+  toast(`💣 펑!! 문제 ${cnt}개 한 번에! 왕에게 ${dmg} 피해`);
+  bossHit(dmg);
+}
+function comboText(n){
+  if(!S.boss) return;
+  const fl=document.createElement('div'); fl.className='float combo'; fl.textContent=n+'번 연속!';
+  fl.style.left=(S.boss.cx+30)+'px'; fl.style.top=(S.boss.el.offsetHeight*0.3)+'px';
+  field.appendChild(fl); setTimeout(()=>fl.remove(),900);
+}
+function addMiss(b){ const k=`${b.a} × ${b.b}`; const m=S.miss[k]||(S.miss[k]={a:b.a,b:b.b,n:0}); m.n++; }
+function lowest(){ return S.blocks.filter(b=>!b.dead).sort((p,q)=>q.y-p.y)[0]; }
+
+function wrongAnswer(){
+  S.wrong++; S.combo=0; flashAnswer('bad'); SFX.wrong();
+  const low = lowest(); if(low) addMiss(low);
+  if(settings.wrongMode==='life'){ loseLife(); toast('그런 답의 문제는 없어요!'); }
+  else { S.boostT = 2; toast('앗! 문제가 빨라졌어요'); }
+}
+function crash(b){
+  killBlock(b,'crash'); addMiss(b);
+  floorEl.classList.remove('flash'); void floorEl.offsetWidth; floorEl.classList.add('flash');
+  if(b.type==='heart' || b.type==='bomb'){ return; }
+  S.combo = 0;
+  if(b.type==='bug' && !b.boss && !settings.bugPenalty){ toast('버그를 놓쳤어요… 다음엔 꼭 고쳐요!'); return; }
+  SFX.crash(); loseLife();
+}
+function loseLife(){
+  S.lives--;
+  const hud=$('#lives'); hud.classList.remove('shake'); void hud.offsetWidth; hud.classList.add('shake');
+  field.classList.remove('hit'); void field.offsetWidth; field.classList.add('hit');
+  updateHUD();
+  if(S.lives<=0) endGame(false);
+}
+
+/* ---------- 버그왕 (모든 스테이지 같은 크기) ---------- */
+function kingPx(){
+  const W=field.clientWidth, H=field.clientHeight;
+  return Math.max(3, Math.min(8, Math.floor(W*0.4/15), Math.floor(H*0.28/17)));
+}
+function startBoss(){
+  const g=S;
+  S.phase = 'intro'; S.waveQueue = 0;
+  S.blocks.forEach(b=>{ if(!b.dead) killBlock(b,'poof'); }); S.blocks=[];
+  const name = KINGS[S.tier][S.stage];
+  openOverlay(`<p>${STAGES[S.stage].target}점 달성! 무언가 다가와요…</p><canvas id="introKing"></canvas><h2>${name} 등장!</h2><div class="say">“${KING_SAY[S.stage]}”</div><p>왕의 문제를 맞히면 체력이 줄어요 (체력 ${STAGES[S.stage].hp}).<br>⚠️ 같은 문제가 우수수 쏟아지면 여러 번 입력! 💣 폭탄 구구단은 한 번에 펑!</p>`, true);
+  drawSprite($('#introKing'), KING_ART[S.stage], TIERS[S.tier].pal, 7);
+  SFX.boss();
+  setTimeout(()=>{ if(S!==g||!S.running) return; closeOverlay(); spawnBoss(); }, 2800);
+}
+function spawnBoss(){
+  const st = STAGES[S.stage], art = KING_ART[S.stage];
+  const el = document.createElement('div'); el.className='boss';
+  el.innerHTML = `<div class="nm">${KINGS[S.tier][S.stage]}</div><div class="hpb"><div style="width:100%"></div></div><div class="body"><canvas></canvas></div>`;
+  field.appendChild(el);
+  drawSprite(el.querySelector('canvas'), art, TIERS[S.tier].pal, kingPx());
+  S.boss = {el, hp:st.hp, max:st.hp, t:0, mv:0, throwT:0.8, rainT:5, rainQ:0, rainGap:0, bombT:8, rage:false, cx:field.clientWidth/2};
+  S.combo = 0;
+  S.phase = 'boss';
+  updateHUD();
+}
+function bossThrow(){
+  const B=S.boss, start = B.el.offsetHeight + 10;
+  const r = Math.random();
+  if(r<0.25 && S.lives<S.maxLives) makeBlock('heart',{start, cx:B.cx});   // 생명 문제 (예전의 2.5배)
+  else if(r<0.55) makeBlock('bug',{boss:true, start, cx:B.cx});   // 왕도 버그 문제를 던져요: 맞히면 디버깅 + 왕 공격
+  else makeBlock('boss',{boss:true, start, cx:B.cx});
+}
+function bossHit(dmg=1){
+  const B=S.boss; if(!B || B.hp<=0) return;
+  B.hp = Math.max(0, B.hp-dmg); SFX.boss();
+  if(!B.rage && B.hp>0 && B.hp<=B.max/2){
+    B.rage = true; B.el.classList.add('rage'); field.classList.add('rage');
+    const g=S; setTimeout(()=>{ if(S===g && S.running) toast('😡 버그왕이 화났어요! 문제 비가 더 자주 와요!','bugfix'); }, 900);
+  }
+  B.el.querySelector('.hpb div').style.width = (B.hp/B.max*100)+'%';
+  B.el.classList.remove('hurt'); void B.el.offsetWidth; B.el.classList.add('hurt');
+  const fl = document.createElement('div'); fl.className='float bad'; fl.textContent='-'+dmg;
+  fl.style.left = (B.cx-10)+'px'; fl.style.top = (B.el.offsetHeight*0.6)+'px'; field.appendChild(fl); setTimeout(()=>fl.remove(),900);
+  updateHUD();
+  if(B.hp<=0) defeatBoss();
+}
+function defeatBoss(){
+  const g=S, B=S.boss;
+  S.phase='clear'; S.score += 100;
+  S.blocks.forEach(b=>{ if(!b.dead) killBlock(b,'poof'); }); S.blocks=[];
+  B.el.classList.add('defeat'); SFX.clear(); field.classList.remove('rage');
+  toast('버그왕을 물리쳤어요! +100');
+  updateHUD();
+  setTimeout(()=>{
+    if(S!==g||!S.running) return;
+    if(S.stage>=2){ endGame(true); return; }
+    const name = KINGS[S.tier][S.stage];
+    openOverlay(`<h2>${S.stage+1}단계 통과!</h2><p>${name}을(를) 물리쳤어요.<br>이번 단계에서 고친 버그 <b style="color:var(--bug)">${S.stageFixed}</b>개</p>
+      <div class="btns"><button class="btn" id="btnNext" type="button">${S.stage+2}단계 시작</button></div>`, true);
+    $('#btnNext').onclick = ()=>{ closeOverlay(); startStage(S.stage+1); };
+    $('#btnNext').focus();
+  }, 1300);
+}
+
+/* ---------- HUD / 효과 ---------- */
+function updateHUD(){
+  if(!S) return;
+  const n = Math.max(5, S.lives);
+  $('#lives').innerHTML = Array.from({length:n},(_,i)=>`<i class="${i<S.lives?'':'empty'}">♥</i>`).join('');
+  $('#stg').innerHTML = `${S.stage+1}단계<small>${dansLabel(S.dans)} · ${SPEEDS[S.speed].short}</small>`;
+  $('#score').textContent = S.score;
+  if(S.boss && S.phase!=='play'){
+    $('#progLbl').textContent = `버그왕 체력 ${Math.max(0,S.boss.hp)}`;
+    $('#progFill').style.width = (S.boss.hp/S.boss.max*100)+'%';
+  } else {
+    const t = STAGES[S.stage].target;
+    $('#progLbl').textContent = `버그왕까지 ${Math.max(0, t-S.stagePts)}점`;
+    $('#progFill').style.width = Math.min(100, S.stagePts/t*100)+'%';
+  }
+}
+function floatText(b, txt, cls=''){
+  const fl=document.createElement('div'); fl.className='float '+cls; fl.textContent=txt;
+  fl.style.left = (b.px + 4)+'px'; fl.style.top = (b.py)+'px';
+  field.appendChild(fl); setTimeout(()=>fl.remove(),900);
+}
+function toast(txt, cls=''){
+  field.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div'); t.className='toast '+cls; t.textContent=txt;
+  field.appendChild(t); setTimeout(()=>t.remove(),1400);
+}
+function updateSoundBtn(){ $('#btnSound').textContent = settings.sound ? '🔊' : '🔇'; }
+$('#btnSound').onclick = ()=>{ settings.sound=!settings.sound; saveSettings(); updateSoundBtn(); if(settings.sound) SFX.ok(); };
+
+/* ---------- 오버레이 / 일시정지 ---------- */
+function openOverlay(html, hold, banner){
+  $('#ovCard').className = 'card'+(banner?' banner':'');
+  $('#ovCard').innerHTML = html; $('#ov').hidden = false;
+  if(S && hold) S.hold = true;
+}
+function closeOverlay(){ $('#ov').hidden = true; if(S) S.hold = false; }
+function togglePause(){
+  if(!S||!S.running||S.hold&&!S.paused) return;
+  if(S.paused){ S.paused=false; $('#ov').hidden=true; return; }
+  S.paused = true;
+  $('#ovCard').className='card';
+  $('#ovCard').innerHTML = `<h2>잠깐 멈춤</h2><p>선생님 설명을 들어 봐요.<br>Esc 키나 아래 버튼을 누르면 이어서 해요.</p>
+    <div class="btns"><button class="btn" id="btnResume" type="button">계속하기</button><button class="btn ghost" id="btnQuit" type="button">그만하고 결과 보기</button></div>`;
+  $('#ov').hidden=false;
+  $('#btnResume').onclick = togglePause;
+  $('#btnQuit').onclick = ()=>{ S.paused=false; $('#ov').hidden=true; endGame(false, true); };
+  $('#btnResume').focus();
+}
+$('#btnPause').onclick = togglePause;
+
+document.addEventListener('keydown', e=>{
+  if(!$('#ov').hidden){
+    if(e.key==='Escape' && S && S.paused){ e.preventDefault(); togglePause(); return; }
+    if(e.key===' '){ e.preventDefault(); return; }
+    if(e.key==='Enter'){ const b=$('#ovCard .btn'); if(b){ e.preventDefault(); b.click(); } }
+    return;
+  }
+  if(!$('#scrStory').hidden){
+    if(e.key==='ArrowRight') $('#stNext').click();
+    else if(e.key==='ArrowLeft') $('#stPrev').click();
+    return;
+  }
+  if(!$('#scrPractice').hidden){
+    if(!P.active) return;
+    if(/^[0-9]$/.test(e.key)){ e.preventDefault(); prDigit(e.key); }
+    else if(e.key==='Backspace'){ e.preventDefault(); prDel(); }
+    else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); prSubmit(); }
+    return;
+  }
+  if(!$('#scrSetup').hidden) return;
+  if($('#scrGame').hidden || !S) return;
+  if(/^[0-9]$/.test(e.key)){ e.preventDefault(); addDigit(e.key); }
+  else if(e.key==='Backspace'){ e.preventDefault(); delDigit(); }
+  else if(e.key==='Enter'){ e.preventDefault(); submit(); }
+  else if(e.key===' '){ e.preventDefault(); submit(); }
+  else if(e.key==='Escape'){ e.preventDefault(); togglePause(); }
+});
+
+/* ---------- 결과 ---------- */
+function endGame(win, quit){
+  S.running = false;
+  closeOverlay();
+  if(!win && !quit) SFX.lose();
+  const prev = getBest(S.speed), isNew = S.score > prev;
+  if(isNew) setBest(S.speed, S.score);
+  const g=S;
+  if(win){ setTimeout(()=>{ if(S===g) celebrate(isNew, prev); }, 600); return; }
+  setTimeout(()=>{ if(S===g) renderResult(win, quit, isNew, prev); }, quit?0:900);
+}
+/* ---------- 3단계 왕까지 모두 물리쳤을 때: 꽃가루 축하 ---------- */
+function celebrate(isNew, prev){
+  const g=S;
+  $('#ovCard').className = 'card victory';
+  $('#ovCard').innerHTML = `
+    <div class="trophy">🏆</div>
+    <h2 class="cheer">축하합니다!!</h2>
+    <p class="v-sub">세 명의 버그왕을 모두 물리쳤어요!<br>2단부터 9단까지, 버그를 모두 막아 냈어요.</p>
+    <div class="v-badge">🎖️ 오늘의 디버깅 대장</div>
+    <div class="v-stats"><span><b>${S.score}</b>점</span><span>고친 버그 <b>${S.fixed.length}</b>개</span><span>맞힌 문제 <b>${S.correct}</b>개</span></div>
+    ${isNew ? '<div class="v-new">🎉 내 최고 기록 경신!</div>' : ''}
+    <button class="btn" id="btnVictory" type="button">내 기록 보기</button>`;
+  $('#ov').hidden = false;
+  $('#btnVictory').onclick = ()=>{ $('#ov').hidden = true; if(S===g) renderResult(true, false, isNew, prev); confetti(2500, 60); };
+  $('#btnVictory').focus();
+  tone([523,659,784,1047,0,784,1047,1319,1568],0.13,'triangle',0.07);
+  confetti(7000, 260);
+}
+let confettiRun = 0;
+function confetti(ms, count){
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const id = ++confettiRun;
+  let cv = document.getElementById('confetti');
+  if(!cv){ cv = document.createElement('canvas'); cv.id='confetti'; document.body.appendChild(cv); }
+  const ctx = cv.getContext('2d');
+  const W = cv.width = innerWidth, H = cv.height = innerHeight;
+  const colors = ['#ffcf4a','#ff5d73','#7be0a6','#6fd3ff','#b48cff','#ff9f43','#ffffff','#ff8fb6'];
+  const parts = [];
+  const add = (x,y,vx,vy)=>parts.push({x,y,vx,vy,w:6+Math.random()*7,h:8+Math.random()*10,r:Math.random()*6,vr:(Math.random()-.5)*0.3,
+    c:colors[Math.floor(Math.random()*colors.length)], shape:Math.random()<0.25?'circle':Math.random()<0.5?'petal':'rect', sway:Math.random()*6});
+  // 양쪽 아래에서 팡! 터지고, 위에서도 꽃가루가 내려와요
+  for(let i=0;i<count*0.35;i++){ add(0, H*0.85, 6+Math.random()*9, -(10+Math.random()*12)); add(W, H*0.85, -(6+Math.random()*9), -(10+Math.random()*12)); }
+  for(let i=0;i<count*0.3;i++) add(Math.random()*W, -Math.random()*H*0.6, (Math.random()-.5)*2, 1+Math.random()*2);
+  const t0 = performance.now();
+  (function tick(now){
+    if(id!==confettiRun) return;
+    const t = now - t0;
+    ctx.clearRect(0,0,W,H);
+    ctx.globalAlpha = t > ms-800 ? Math.max(0,(ms-t)/800) : 1;
+    for(const p of parts){
+      p.vy += 0.22; p.vy = Math.min(p.vy, 4.2); p.vx *= 0.985;
+      p.x += p.vx + Math.sin((t/300)+p.sway)*0.8; p.y += p.vy; p.r += p.vr;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=p.c;
+      if(p.shape==='circle'){ ctx.beginPath(); ctx.arc(0,0,p.w/2,0,Math.PI*2); ctx.fill(); }
+      else if(p.shape==='petal'){ ctx.beginPath(); ctx.ellipse(0,0,p.w/2,p.h/2,0,0,Math.PI*2); ctx.fill(); }
+      else ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h*0.6);
+      ctx.restore();
+      if(p.y > H+20 && t < ms-1500){ p.y = -10; p.x = Math.random()*W; p.vy = 1+Math.random()*2; p.vx=(Math.random()-.5)*2; }
+    }
+    if(t < ms) requestAnimationFrame(tick); else cv.remove();
+  })(t0);
+}
+function renderResult(win, quit, isNew, prev){
+  clearField();
+  const title = win ? '모든 버그왕을 물리쳤어요!' : quit ? '오늘의 기록' : '대작전 끝! 잘했어요';
+  const missTop = Object.values(S.miss).sort((p,q)=>q.n-p.n).slice(0,6);
+  const fixed = S.fixed;
+  const canRetry = !win && S.stage>0;
+  $('#scrResult').innerHTML = `
+    <div class="res-head">
+      <div class="label" style="margin:0">${SPEEDS[S.speed].short} 속도 · ${S.stage+1}단계(${dansLabel(S.dans)})까지</div>
+      <h2>${title}</h2>
+      <div class="big">${S.score}점</div>
+      ${isNew ? '<span class="new">내 최고 기록 경신!</span>' : `<span class="empty">이 속도의 내 최고 기록 ${prev}점</span>`}
+      <div class="stats"><span>맞힌 문제 ${S.correct}개</span><span>틀린 입력 ${S.wrong}번</span><span>고친 버그 ${fixed.length}개</span></div>
+    </div>
+    <div class="res-grid">
+      <div class="box debug">
+        <h3>🐞 나의 디버깅 기록</h3>
+        <p>컴퓨터가 틀린 계산을 찾아서 바르게 고쳤어요. 1947년 연구원들이 컴퓨터 속 나방을 찾아낸 것처럼, 프로그램의 잘못을 찾아 고치는 일을 <b style="color:var(--text)">디버깅</b>이라고 해요.</p>
+        ${fixed.length ? `<ol class="fixlist">${fixed.map((f,i)=>`<li><span class="n">${i+1}</span>${f.a} × ${f.b} = <s>${f.wrong}</s> → <span class="ok">${f.ans}</span></li>`).join('')}</ol>`
+          : '<div class="empty">이번 판에서는 버그를 고치지 못했어요. 다음엔 빨간 버그 문제를 노려 봐요!</div>'}
+      </div>
+      <div class="box">
+        <h3>다시 연습하면 좋은 문제</h3>
+        <p>바닥에 떨어뜨렸거나 헷갈렸던 문제예요. 숫자는 헷갈린 횟수예요.</p>
+        ${missTop.length ? `<div class="chips">${missTop.map(m=>`<span>${m.a} × ${m.b} = ${m.a*m.b}<small>${m.n}번</small></span>`).join('')}</div>`
+          : '<div class="empty">헷갈린 문제가 하나도 없어요. 완벽해요!</div>'}
+      </div>
+    </div>
+    <div class="btns" style="padding-bottom:20px">
+      ${canRetry ? `<button class="btn" id="btnRetry" type="button">${S.stage+1}단계부터 다시 도전</button>` : ''}
+      <button class="btn${canRetry?' ghost':''}" id="btnAgain" type="button">처음부터 다시</button>
+      <button class="btn ghost" id="btnHome" type="button">설정 바꾸기</button>
+      <button class="btn ghost" id="btnPractice" type="button">📒 단별 연습하기</button>
+    </div>`;
+  show('#scrResult');
+  const last = S;
+  if(canRetry) $('#btnRetry').onclick = ()=>startGame({speed:last.speed, stage:last.stage, score:last.stageStartScore,
+      fixed:last.fixed, miss:last.miss, correct:last.correct, wrong:last.wrong});
+  $('#btnAgain').onclick = ()=>startGame({speed:last.speed, stage:0, score:0, fixed:[], miss:{}, correct:0, wrong:0});
+  $('#btnHome').onclick = ()=>{ S=null; renderSetup(); show('#scrSetup'); };
+  $('#btnPractice').onclick = ()=>{ S=null; openPractice(); };
+}
+
+
+/* ---------- 구구단 단별 연습 ---------- */
+const P = {dan:2, order:[], i:0, input:'', tries:0, first:0, active:false, allOpen:false};
+function openPractice(){ renderPractice(); show('#scrPractice'); }
+function renderPractice(){
+  P.dan = sel.prDan;
+  $('#prDans').innerHTML = [2,3,4,5,6,7,8,9].map(d=>{
+    const t=TIERS[danTier(d)];
+    return `<button type="button" class="dan" id="pr-${d}" data-d="${d}" aria-pressed="${d===P.dan}" style="--tc:${t.color}"><span class="n">${d}단</span><span class="tier">난이도 ${t.lv}</span></button>`;
+  }).join('');
+  $('#prDans').querySelectorAll('.dan').forEach(b=>b.onclick=()=>{ sel.prDan=+b.dataset.d; saveSettings(); P.allOpen=false; renderPractice(); prReset(); });
+  $('#prTitle').textContent = `${P.dan}단 외우기`;
+  $('#prAll').textContent = P.allOpen ? '답 모두 가리기' : '답 모두 보기';
+  $('#prRows').innerHTML = [1,2,3,4,5,6,7,8,9].map(b=>`<button type="button" class="pr-row${P.allOpen?' open':''}" data-b="${b}">
+      <span class="pr-eq">${P.dan} × ${b} =</span><span class="pr-v">${P.dan*b}</span>
+      <span class="pr-add">${P.dan}씩 ${b}번: ${Array(b).fill(P.dan).join(' + ')}</span></button>`).join('');
+  $('#prRows').querySelectorAll('.pr-row').forEach(r=>r.onclick=()=>r.classList.toggle('open'));
+}
+$('#prAll').onclick = ()=>{ P.allOpen=!P.allOpen; renderPractice(); };
+function prReset(){ P.active=false; $('#prStart').hidden=false; $('#prRun').hidden=true; $('#prDone').hidden=true; }
+function prBegin(shuffle){
+  P.order=[1,2,3,4,5,6,7,8,9];
+  if(shuffle) for(let i=8;i>0;i--){ const j=rnd(i+1); [P.order[i],P.order[j]]=[P.order[j],P.order[i]]; }
+  P.i=0; P.first=0; P.input=''; P.tries=0; P.active=true; P.shuffle=shuffle;
+  $('#prStart').hidden=true; $('#prRun').hidden=false; $('#prDone').hidden=true;
+  prShow();
+}
+function prShow(){
+  const b=P.order[P.i];
+  $('#prQ').textContent = `${P.dan} × ${b} = ?`;
+  $('#prDots').innerHTML = P.order.map((_,k)=>`<i class="${k<P.i?'done':k===P.i?'now':''}"></i>`).join('');
+  $('#prFb').className='pr-fb'; $('#prFb').textContent = `${P.i+1}번째 문제 · 숫자를 입력하고 확인(또는 스페이스바)!`;
+  P.input=''; P.tries=0; prRenderIn();
+}
+function prRenderIn(){ $('#prAns').innerHTML = P.input || '<span class="ph">답 입력</span>'; }
+function prDigit(d){ if(!P.active) return; if(P.input.length>=2) P.input=P.input.slice(1); P.input+=d; if(P.input==='0') P.input=''; prRenderIn(); }
+function prDel(){ P.input=P.input.slice(0,-1); prRenderIn(); }
+function prSubmit(){
+  if(!P.active||!P.input) return;
+  const b=P.order[P.i], ans=P.dan*b, v=parseInt(P.input,10);
+  const a=$('#prAns'); a.classList.remove('good','bad'); void a.offsetWidth;
+  if(v===ans){
+    if(P.tries===0) P.first++;
+    const row=$(`#prRows .pr-row[data-b="${b}"]`); if(row) row.classList.add('open');
+    a.classList.add('good'); SFX.ok();
+    $('#prFb').className='pr-fb ok'; $('#prFb').textContent = `딩동댕! ${P.dan} × ${b} = ${ans}`;
+    P.active=false;
+    setTimeout(()=>{ P.i++; if(P.i>=9) prFinish(); else { P.active=true; prShow(); } }, 800);
+  } else {
+    P.tries++; a.classList.add('bad'); SFX.wrong(); P.input=''; prRenderIn();
+    $('#prFb').className='pr-fb bad';
+    $('#prFb').textContent = P.tries===1 ? `다시 해 봐요! 힌트: ${P.dan}씩 ${b}번 → ${Array(b).fill(P.dan).join(' + ')}`
+                                         : `정답은 ${ans}이에요. ${ans}을(를) 입력해 봐요!`;
+  }
+}
+function prFinish(){
+  P.active=false; $('#prRun').hidden=true; $('#prDone').hidden=false;
+  const stars = P.first>=9?3:P.first>=6?2:1;
+  $('#prStars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3-stars);
+  $('#prDoneTitle').textContent = `${P.dan}단 연습 끝!`;
+  $('#prDoneText').textContent = P.first===9 ? `9문제를 모두 한 번에 맞혔어요! ${P.dan}단 완벽해요. 이제 대작전에서 실력을 보여 줘요!`
+     : `9문제 중 ${P.first}문제를 한 번에 맞혔어요. ${P.shuffle?'':'이번엔 섞어서도 풀어 봐요!'} 조금만 더 연습하면 완벽해요.`;
+  $('#prNextDan').textContent = P.dan<9 ? `${P.dan+1}단 연습` : '2단부터 다시';
+  SFX.clear();
+}
+$('#prOrder').onclick = ()=>prBegin(false);
+$('#prRandom').onclick = ()=>prBegin(true);
+$('#prAgain').onclick = ()=>prBegin(P.shuffle);
+$('#prNextDan').onclick = ()=>{ sel.prDan = P.dan<9 ? P.dan+1 : 2; saveSettings(); P.allOpen=false; renderPractice(); prReset(); };
+$('#prPad').innerHTML = padKeys.map(k=> k==='del' ? '<button type="button" class="del" data-k="del">지우기</button>'
+  : k==='go' ? '<button type="button" class="go" data-k="go">확인</button>' : `<button type="button" data-k="${k}">${k}</button>`).join('');
+$('#prPad').querySelectorAll('button').forEach(b=>b.onclick=()=>{ const k=b.dataset.k; if(k==='del') prDel(); else if(k==='go') prSubmit(); else prDigit(k); });
+
+window.addEventListener('resize', ()=>{
+  if(S && S.boss){ drawSprite(S.boss.el.querySelector('canvas'), KING_ART[S.stage], TIERS[S.tier].pal, kingPx()); }
+});
+
+renderStory();
+renderSetup();
+$('#toSetup').onclick = ()=>{ renderSetup(); show('#scrSetup'); };
+$('#toPractice').onclick = ()=>openPractice();
+$('#prToGame').onclick = ()=>{ renderSetup(); show('#scrSetup'); };
+show('#scrStory');
+})();
+</script>
+
+</body>
+</html>
