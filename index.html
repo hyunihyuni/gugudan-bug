@@ -456,7 +456,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 
     <div class="label">이런 문제가 떨어져요</div>
     <div class="legend">
-      <div class="lg"><div class="face"><span class="q">6 × 4</span></div><p><b>보통 문제</b>답을 입력하면 펑! 바닥에 닿으면 ♥ 하나가 줄어요.</p></div>
+      <div class="lg"><div class="face"><span class="q">6 × 4</span></div><p><b>보통 문제</b>답을 입력하면 펑! 바닥에 닿으면 ♥ 하나가 줄어요. (설정에서 끌 수 있어요)</p></div>
       <div class="lg"><div class="face t-fast"><span class="tag">⚡ 번개</span><span class="q">3 × 7</span></div><p><b>번개 문제</b>두 배로 빨리 떨어져요. 잡으면 점수 두 배!</p></div>
       <div class="lg"><div class="face t-bug"><canvas id="lgBug"></canvas><span class="q">5 × 6 = <b class="bad">35</b></span></div><p><b>버그 문제</b>컴퓨터가 계산을 틀렸어요. 맞는 답(30)을 입력해 고치는 것이 <b style="display:inline;font-size:inherit">디버깅</b>이에요.</p></div>
       <div class="lg"><div class="face t-bomb"><span class="tag">💣 한 번에 펑!</span><span class="q">4 × 6</span></div><p><b>폭탄 문제</b>버그왕이 나왔을 때만 떨어져요. 맞히면 화면의 문제가 한 번에 터지고 왕에게 큰 피해!</p></div>
@@ -465,7 +465,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 
     <div class="label">설정</div>
     <div class="toggles">
-      <button type="button" class="tg" id="tgBug" data-key="bugPenalty" role="switch"><span class="ic">🐞</span><span class="tx">버그 놓치면 ♥ 줄기</span><span class="sw"></span></button>
+      <button type="button" class="tg" id="tgBug" data-key="bugPenalty" role="switch"><span class="ic">⬇️</span><span class="tx">바닥에 닿으면 ♥ 줄기</span><span class="sw"></span></button>
       <button type="button" class="tg" id="tgWrong" data-key="wrongMode" role="switch"><span class="ic">✖️</span><span class="tx">틀리면 ♥ 줄기</span><span class="sw"></span></button>
       <button type="button" class="tg" id="tgSound" data-key="sound" role="switch"><span class="ic">🔊</span><span class="tx">효과음</span><span class="sw"></span></button>
     </div>
@@ -505,15 +505,15 @@ const $ = s => document.querySelector(s);
 const field = $('#field'), floorEl = $('#floor');
 
 /* ---------- 데이터 ---------- */
-// 단별 난이도: 2~5단 하, 6~7단 중, 8~9단 고
+// 단별 난이도 (담임 선생님 의견 반영): 2~5단 하, 6·9단 중, 7·8단 고
 const TIERS = {
   easy:{lv:'하', color:'var(--easy)', pal:{b:'#7ed957',d:'#3c8a36',h:'#c9f7aa'}},
   mid: {lv:'중', color:'var(--mid)',  pal:{b:'#ff9f43',d:'#b85a22',h:'#ffd8a8'}},
   hard:{lv:'고', color:'var(--hard)', pal:{b:'#b48cff',d:'#5d3aa8',h:'#e2d3ff'}},
 };
-const danTier = d => d<=5 ? 'easy' : d<=7 ? 'mid' : 'hard';
-// 스테이지별 단: 1 → 2~5단, 2 → 2~7단, 3 → 2~9단
-const STAGE_DANS = [[2,3,4,5],[2,3,4,5,6,7],[2,3,4,5,6,7,8,9]];
+const danTier = d => d<=5 ? 'easy' : (d===6||d===9) ? 'mid' : 'hard';
+// 단계별 단: 1 → 하(2~5단), 2 → 하+중(2~6단, 9단), 3 → 전체(2~9단)
+const STAGE_DANS = [[2,3,4,5],[2,3,4,5,6,9],[2,3,4,5,6,7,8,9]];
 const STAGE_TIER = ['easy','mid','hard'];
 const SPEEDS = {
   slow:  {name:'🌱 초급 (천천히)', short:'초급', f:1.35},
@@ -532,6 +532,8 @@ const STAGES = [
   {target:400,  fall:10,  spawn:2.2, max:6, bug:0.17, hp:18, thr:2.4, bmax:3, bugPx:5},
   {target:500,  fall:8.5, spawn:1.9, max:7, bug:0.21, hp:22, thr:2.1, bmax:3, bugPx:6},
 ];
+// 수업 후 조정: 숫자 입력 시간을 고려해 모든 속도에서 떨어지는 속도를 2배 느리게
+const FALL_SLOW = 2, SPAWN_SLOW = 1.3;
 const PTS = {normal:10, fast:20, bug:30, heart:10, boss:20, bomb:30};
 
 /* ---------- 픽셀 스프라이트 (왼쪽 절반만 적고 좌우 대칭) ---------- */
@@ -561,17 +563,23 @@ function drawSprite(cv, art, pal, px){
 /* ---------- 설정 / 기록 ---------- */
 const settings = {bugPenalty:true, wrongMode:'life', sound:true};
 const sel = {speed:'normal', prDan:2};
-try{ Object.assign(settings, JSON.parse(localStorage.getItem('gugu-bug-settings2')||'{}')); }catch(e){}
-try{ const s = JSON.parse(localStorage.getItem('gugu-bug-sel')||'null'); if(s && SPEEDS[s.speed]) sel.speed = s.speed; if(s && s.prDan>=2 && s.prDan<=9) sel.prDan = s.prDan; }catch(e){}
-function saveSettings(){ try{ localStorage.setItem('gugu-bug-settings2', JSON.stringify(settings)); localStorage.setItem('gugu-bug-sel', JSON.stringify(sel)); }catch(e){} }
+// 속도와 스위치는 저장하지 않아요: 페이지를 새로 열 때마다 항상 '보통 속도 + 모두 켬'으로 시작
+try{ const s = JSON.parse(localStorage.getItem('gugu-bug-sel')||'null'); if(s && s.prDan>=2 && s.prDan<=9) sel.prDan = s.prDan; }catch(e){}
+function saveSettings(){ try{ localStorage.setItem('gugu-bug-sel', JSON.stringify({prDan:sel.prDan})); }catch(e){} }   // 단별 연습에서 고른 단만 기억
 const bestKey = speed => 'gugu-bug-best3-'+speed;
 function getBest(speed){ try{ return parseInt(localStorage.getItem(bestKey(speed))||'0',10)||0; }catch(e){ return 0; } }
 function setBest(speed,v){ try{ localStorage.setItem(bestKey(speed), String(v)); }catch(e){} }
 function dansLabel(dans){
   const d=[...dans].sort((a,b)=>a-b);
   if(d.length===1) return d[0]+'단';
-  const contiguous = d.every((v,i)=>i===0||v===d[i-1]+1);
-  return contiguous ? `${d[0]}~${d[d.length-1]}단` : d.join('·')+'단';
+  // 이어진 단은 묶어서: [2,3,4,5,6,9] → 2~6·9단
+  const parts=[]; let st=d[0], pv=d[0];
+  for(let i=1;i<=d.length;i++){
+    if(i<d.length && d[i]===pv+1){ pv=d[i]; continue; }
+    parts.push(st===pv ? `${st}` : `${st}~${pv}`);
+    if(i<d.length){ st=d[i]; pv=d[i]; }
+  }
+  return parts.join('·')+'단';
 }
 
 /* ---------- 효과음 ---------- */
@@ -757,7 +765,7 @@ function startStage(n){
   if(S.boss){ S.boss.el.remove(); S.boss = null; }
   field.className = 'field s'+(n+1);
   updateHUD();
-  const sub = ['버그들이 내려오기 시작했어요!','6단·7단이 섞여 나와요! 버그도 더 커졌어요!','마지막 단계! 8단·9단까지 모두 나와요!'][n];
+  const sub = ['버그들이 내려오기 시작했어요!','6단·9단이 섞여 나와요! 버그도 더 커졌어요!','마지막 단계! 어려운 7단·8단까지 모두 나와요!'][n];
   openOverlay(`<h2>${n+1}단계</h2><p><b style="color:var(--sun)">${dansLabel(STAGE_DANS[n])}</b> · ${sub}<br>버그왕까지 ${STAGES[n].target}점</p>`, true, true);
   setTimeout(()=>{ if(S===g && S.running) closeOverlay(); }, 1800);
 }
@@ -814,7 +822,7 @@ function makeBlock(type, opt={}){
   let durMul = {normal:1, fast:0.5, heart:0.9, bug:1.05, boss:0.85, bomb:0.95}[type];
   const ramp = 1 - 0.2*progress();
   const blk = {id:++uid, a, b, ans, type, wrongV, el, face, x, y:0, w, h, start:opt.start||0,
-               dur: st.fall*f*durMul*ramp, boss:!!opt.boss, dead:false, px:0, py:0};
+               dur: st.fall*f*FALL_SLOW*durMul*ramp, boss:!!opt.boss, dead:false, px:0, py:0};
   S.blocks.push(blk);
   placeBlock(blk, W, field.clientHeight);
   return blk;
@@ -868,7 +876,7 @@ function update(dt){
     } else {
       S.spawnT -= dt;
       if(S.spawnT<=0 && S.blocks.filter(b=>!b.dead).length < st.max){
-        spawnNormal(); S.spawnT = st.spawn*f*(1-0.25*progress())*(0.8+Math.random()*0.4);
+        spawnNormal(); S.spawnT = st.spawn*f*SPAWN_SLOW*(1-0.25*progress())*(0.8+Math.random()*0.4);
       }
     }
   } else if(S.phase==='boss' && S.boss){
@@ -901,7 +909,7 @@ function update(dt){
     B.throwT -= dt;
     const active = S.blocks.filter(b=>!b.dead && b.boss).length;
     if(B.throwT<=0 && active < st.bmax){
-      bossThrow(); B.throwT = st.thr*f*(0.85+Math.random()*0.3);
+      bossThrow(); B.throwT = st.thr*f*SPAWN_SLOW*(0.85+Math.random()*0.3);
     }
   }
 
@@ -987,14 +995,15 @@ function wrongAnswer(){
   S.wrong++; S.combo=0; flashAnswer('bad'); SFX.wrong();
   const low = lowest(); if(low) addMiss(low);
   if(settings.wrongMode==='life'){ loseLife(); toast('그런 답의 문제는 없어요!'); }
-  else { S.boostT = 2; toast('앗! 문제가 빨라졌어요'); }
+  else { toast('앗, 다시 해 봐요!'); }   // 끔: 생명도 줄지 않고 문제도 빨라지지 않아요
 }
 function crash(b){
   killBlock(b,'crash'); addMiss(b);
   floorEl.classList.remove('flash'); void floorEl.offsetWidth; floorEl.classList.add('flash');
   if(b.type==='heart' || b.type==='bomb'){ return; }
   S.combo = 0;
-  if(b.type==='bug' && !b.boss && !settings.bugPenalty){ toast('버그를 놓쳤어요… 다음엔 꼭 고쳐요!'); return; }
+  // 바닥에 닿으면 ♥ 줄기 끔: 어떤 문제가 바닥에 닿아도 생명이 줄지 않아요
+  if(!settings.bugPenalty){ toast(b.type==='bug' ? '버그를 놓쳤어요… 다음엔 꼭 고쳐요!' : '놓쳤어요! 다음엔 꼭 잡아요'); return; }
   SFX.crash(); loseLife();
 }
 function loseLife(){
